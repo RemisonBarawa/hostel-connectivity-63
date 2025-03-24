@@ -44,6 +44,7 @@ const HostelSearch = () => {
     queryKey: ['hostels'],
     queryFn: async () => {
       try {
+        console.log("Fetching hostels from Supabase");
         const { data, error } = await supabase
           .from('hostels')
           .select(`
@@ -52,7 +53,12 @@ const HostelSearch = () => {
             hostel_images (*)
           `);
         
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase error:", error);
+          throw error;
+        }
+        
+        console.log("Fetched hostels data:", data);
         
         // Transform Supabase data to match Hostel type
         return data.map(hostel => {
@@ -342,7 +348,22 @@ const HostelSearch = () => {
               <p className="text-muted-foreground max-w-md mx-auto mb-6">
                 No hostels match your current filters. Try adjusting your search criteria or clearing filters.
               </p>
-              <Button onClick={clearFilters}>Clear All Filters</Button>
+              <Button onClick={() => {
+                setSearchForm({
+                  location: "",
+                  minPrice: 0,
+                  maxPrice: 1000,
+                  amenities: {
+                    wifi: false,
+                    water: false,
+                    electricity: false,
+                    security: false,
+                    furniture: false,
+                    kitchen: false,
+                    bathroom: false,
+                  },
+                });
+              }}>Clear All Filters</Button>
             </div>
           ) : (
             // Results grid
