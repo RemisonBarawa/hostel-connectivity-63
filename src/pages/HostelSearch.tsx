@@ -22,7 +22,8 @@ const HostelSearch = () => {
   // Extract search parameters from URL
   const initialLocation = searchParams.get("location") || "";
   
-  // State for search form
+  // State for search form and filters visibility
+  const [showFilters, setShowFilters] = useState(false);
   const [searchForm, setSearchForm] = useState({
     location: initialLocation,
     minPrice: 0,
@@ -55,7 +56,16 @@ const HostelSearch = () => {
         
         // Transform Supabase data to match Hostel type
         return data.map(hostel => {
-          const amenities = hostel.amenities?.[0] || {};
+          const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
+            wifi: false,
+            water: false,
+            electricity: false,
+            security: false,
+            furniture: false,
+            kitchen: false,
+            bathroom: false
+          };
+          
           const images = hostel.hostel_images || [];
           
           return {
@@ -67,13 +77,13 @@ const HostelSearch = () => {
             rooms: hostel.rooms,
             ownerId: hostel.owner_id,
             amenities: {
-              wifi: amenities.wifi || false,
-              water: amenities.water || false,
-              electricity: amenities.electricity || false,
-              security: amenities.security || false,
-              furniture: amenities.furniture || false,
-              kitchen: amenities.kitchen || false,
-              bathroom: amenities.bathroom || false,
+              wifi: amenitiesData.wifi || false,
+              water: amenitiesData.water || false,
+              electricity: amenitiesData.electricity || false,
+              security: amenitiesData.security || false,
+              furniture: amenitiesData.furniture || false,
+              kitchen: amenitiesData.kitchen || false,
+              bathroom: amenitiesData.bathroom || false,
             },
             images: images.map(img => img.image_url),
             createdAt: hostel.created_at
