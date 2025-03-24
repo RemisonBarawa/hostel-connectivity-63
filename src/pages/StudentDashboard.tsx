@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,15 +13,14 @@ import Navbar from "../components/Navbar";
 import HostelCard, { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
 
-// Type for booking requests with stricter typing
+// Type for booking requests
 interface BookingRequest {
   id: string;
   hostel_id: string;
   student_id: string;
   status: "pending" | "approved" | "rejected";
   created_at: string;
-  updated_at: string;
-  message?: string | null;
+  message?: string;
   hostel?: Hostel;
 }
 
@@ -48,7 +48,7 @@ const StudentDashboard = () => {
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['studentBookings', user?.id],
     queryFn: async () => {
-      if (!user) return [] as BookingRequest[];
+      if (!user) return [];
       
       try {
         // Get bookings for this student
@@ -74,19 +74,10 @@ const StudentDashboard = () => {
               
             if (hostelError) {
               console.error("Error fetching hostel:", hostelError);
-              return booking as BookingRequest;
+              return booking;
             }
             
-            const amenitiesData = hostelData.amenities && hostelData.amenities[0] ? hostelData.amenities[0] : {
-              wifi: false,
-              water: false,
-              electricity: false,
-              security: false,
-              furniture: false,
-              kitchen: false,
-              bathroom: false
-            };
-            
+            const amenities = hostelData.amenities?.[0] || {};
             const images = hostelData.hostel_images || [];
             
             const hostel: Hostel = {
@@ -98,13 +89,13 @@ const StudentDashboard = () => {
               rooms: hostelData.rooms,
               ownerId: hostelData.owner_id,
               amenities: {
-                wifi: amenitiesData.wifi || false,
-                water: amenitiesData.water || false,
-                electricity: amenitiesData.electricity || false,
-                security: amenitiesData.security || false,
-                furniture: amenitiesData.furniture || false,
-                kitchen: amenitiesData.kitchen || false,
-                bathroom: amenitiesData.bathroom || false,
+                wifi: amenities.wifi || false,
+                water: amenities.water || false,
+                electricity: amenities.electricity || false,
+                security: amenities.security || false,
+                furniture: amenities.furniture || false,
+                kitchen: amenities.kitchen || false,
+                bathroom: amenities.bathroom || false,
               },
               images: images.map((img: any) => img.image_url),
               createdAt: hostelData.created_at
@@ -112,9 +103,8 @@ const StudentDashboard = () => {
             
             return {
               ...booking,
-              status: booking.status as "pending" | "approved" | "rejected",
               hostel
-            } as BookingRequest;
+            };
           })
         );
         
@@ -122,7 +112,7 @@ const StudentDashboard = () => {
       } catch (error) {
         console.error("Error loading dashboard data:", error);
         toast.error("Failed to load dashboard data");
-        return [] as BookingRequest[];
+        return [];
       }
     },
     enabled: !!user && isAuthenticated

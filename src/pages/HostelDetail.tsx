@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -9,7 +10,11 @@ import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { Hostel } from "../components/HostelCard";
 import Navbar from "../components/Navbar";
-import { supabase } from "../integrations/supabase/client";
+
+// Storage keys
+const HOSTELS_STORAGE_KEY = "hostel_listings";
+const BOOKINGS_STORAGE_KEY = "hostel_bookings";
+const USERS_STORAGE_KEY = "hostel_users";
 
 // Type for booking requests
 interface BookingRequest {
@@ -34,89 +39,46 @@ const HostelDetail = () => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [hasRequestedBefore, setHasRequestedBefore] = useState(false);
   
-  // Load hostel data from Supabase
+  // Load hostel data
   useEffect(() => {
     if (!id) return;
     
     setIsLoading(true);
     
-    const fetchHostelData = async () => {
+    // Simulate API call
+    setTimeout(() => {
       try {
         // Get hostel data
-        const { data: hostelData, error: hostelError } = await supabase
-          .from('hostels')
-          .select(`
-            *,
-            amenities (*),
-            hostel_images (*)
-          `)
-          .eq('id', id)
-          .single();
+        const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
+        const hostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
+        const foundHostel = hostels[id];
         
-        if (hostelError) throw hostelError;
-        
-        if (hostelData) {
-          const amenitiesData = hostelData.amenities && hostelData.amenities[0] ? hostelData.amenities[0] : {
-            wifi: false,
-            water: false,
-            electricity: false,
-            security: false,
-            furniture: false,
-            kitchen: false,
-            bathroom: false
-          };
-          
-          const images = hostelData.hostel_images || [];
-          
-          const transformedHostel: Hostel = {
-            id: hostelData.id,
-            name: hostelData.name,
-            location: hostelData.location,
-            description: hostelData.description || '',
-            price: hostelData.price,
-            rooms: hostelData.rooms,
-            ownerId: hostelData.owner_id,
-            amenities: {
-              wifi: amenitiesData.wifi || false,
-              water: amenitiesData.water || false,
-              electricity: amenitiesData.electricity || false,
-              security: amenitiesData.security || false,
-              furniture: amenitiesData.furniture || false,
-              kitchen: amenitiesData.kitchen || false,
-              bathroom: amenitiesData.bathroom || false,
-            },
-            images: images.map((img: any) => img.image_url),
-            createdAt: hostelData.created_at
-          };
-          
-          setHostel(transformedHostel);
+        if (foundHostel) {
+          setHostel(foundHostel);
           
           // Get owner data
-          const { data: ownerData, error: ownerError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', hostelData.owner_id)
-            .single();
+          const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
+          const users = usersJson ? JSON.parse(usersJson) : {};
+          const hostelOwner = users[foundHostel.ownerId];
           
-          if (!ownerError && ownerData) {
+          if (hostelOwner) {
             setOwner({
-              name: ownerData.full_name || 'Unknown',
-              email: 'owner@example.com', // This would normally come from auth data
-              phone: ownerData.phone_number || 'Not provided',
+              name: hostelOwner.name,
+              email: hostelOwner.email,
+              phone: hostelOwner.phone,
             });
           }
           
           // Check if user has already requested this hostel
           if (isAuthenticated && user) {
-            const { data: bookingData, error: bookingError } = await supabase
-              .from('bookings')
-              .select('*')
-              .eq('hostel_id', id)
-              .eq('student_id', user.id);
+            const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
+            const bookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
             
-            if (!bookingError && bookingData && bookingData.length > 0) {
-              setHasRequestedBefore(true);
-            }
+            const hasRequested = Object.values(bookings).some(
+              (booking) => booking.hostelId === id && booking.studentId === user.id
+            );
+            
+            setHasRequestedBefore(hasRequested);
           }
         } else {
           toast.error("Hostel not found");
@@ -128,9 +90,7 @@ const HostelDetail = () => {
       } finally {
         setIsLoading(false);
       }
-    };
-    
-    fetchHostelData();
+    }, 800);
   }, [id, navigate, isAuthenticated, user]);
   
   const navigateImage = (direction: "next" | "prev") => {
@@ -158,23 +118,30 @@ const HostelDetail = () => {
     setRequestDialogOpen(true);
   };
   
-  const submitBookingRequest = async () => {
+  const submitBookingRequest = () => {
     if (!hostel || !user) return;
     
     setIsRequesting(true);
     
     try {
-      // Create a new booking request in Supabase
-      const { error } = await supabase
-        .from('bookings')
-        .insert({
-          hostel_id: hostel.id,
-          student_id: user.id,
-          status: 'pending',
-          message: null // Optional message if you want to add it
-        });
+      // Get existing bookings
+      const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
+      const bookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
       
-      if (error) throw error;
+      // Create a new booking request
+      const bookingId = `booking_${Date.now()}`;
+      const newBooking: BookingRequest = {
+        id: bookingId,
+        hostelId: hostel.id,
+        studentId: user.id,
+        ownerId: hostel.ownerId,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Save to "database"
+      bookings[bookingId] = newBooking;
+      localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings));
       
       // Show success message
       toast.success("Booking request sent successfully");

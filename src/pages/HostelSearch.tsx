@@ -22,8 +22,7 @@ const HostelSearch = () => {
   // Extract search parameters from URL
   const initialLocation = searchParams.get("location") || "";
   
-  // State for search form and filters visibility
-  const [showFilters, setShowFilters] = useState(false);
+  // State for search form
   const [searchForm, setSearchForm] = useState({
     location: initialLocation,
     minPrice: 0,
@@ -44,7 +43,6 @@ const HostelSearch = () => {
     queryKey: ['hostels'],
     queryFn: async () => {
       try {
-        console.log("Fetching hostels from Supabase");
         const { data, error } = await supabase
           .from('hostels')
           .select(`
@@ -53,25 +51,11 @@ const HostelSearch = () => {
             hostel_images (*)
           `);
         
-        if (error) {
-          console.error("Supabase error:", error);
-          throw error;
-        }
-        
-        console.log("Fetched hostels data:", data);
+        if (error) throw error;
         
         // Transform Supabase data to match Hostel type
         return data.map(hostel => {
-          const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
-            wifi: false,
-            water: false,
-            electricity: false,
-            security: false,
-            furniture: false,
-            kitchen: false,
-            bathroom: false
-          };
-          
+          const amenities = hostel.amenities?.[0] || {};
           const images = hostel.hostel_images || [];
           
           return {
@@ -83,13 +67,13 @@ const HostelSearch = () => {
             rooms: hostel.rooms,
             ownerId: hostel.owner_id,
             amenities: {
-              wifi: amenitiesData.wifi || false,
-              water: amenitiesData.water || false,
-              electricity: amenitiesData.electricity || false,
-              security: amenitiesData.security || false,
-              furniture: amenitiesData.furniture || false,
-              kitchen: amenitiesData.kitchen || false,
-              bathroom: amenitiesData.bathroom || false,
+              wifi: amenities.wifi || false,
+              water: amenities.water || false,
+              electricity: amenities.electricity || false,
+              security: amenities.security || false,
+              furniture: amenities.furniture || false,
+              kitchen: amenities.kitchen || false,
+              bathroom: amenities.bathroom || false,
             },
             images: images.map(img => img.image_url),
             createdAt: hostel.created_at
@@ -348,22 +332,7 @@ const HostelSearch = () => {
               <p className="text-muted-foreground max-w-md mx-auto mb-6">
                 No hostels match your current filters. Try adjusting your search criteria or clearing filters.
               </p>
-              <Button onClick={() => {
-                setSearchForm({
-                  location: "",
-                  minPrice: 0,
-                  maxPrice: 1000,
-                  amenities: {
-                    wifi: false,
-                    water: false,
-                    electricity: false,
-                    security: false,
-                    furniture: false,
-                    kitchen: false,
-                    bathroom: false,
-                  },
-                });
-              }}>Clear All Filters</Button>
+              <Button onClick={clearFilters}>Clear All Filters</Button>
             </div>
           ) : (
             // Results grid
