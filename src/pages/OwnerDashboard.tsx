@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -7,28 +6,21 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter, 
-  DialogDescription 
-} from "../components/ui/dialog";
 import { toast } from "sonner";
-import { Home, Clock, Check, X, Edit, Trash, Plus, UserCheck, User } from "lucide-react";
+import { Home, Clock, Check, X, Plus, ExternalLink } from "lucide-react";
 import Navbar from "../components/Navbar";
-import { Hostel } from "../components/HostelCard";
+import HostelCard, { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
 
-// Type for booking requests
+// Type for booking requests with appropriate typing for status
 interface BookingRequest {
   id: string;
   hostel_id: string;
   student_id: string;
   status: "pending" | "approved" | "rejected";
   created_at: string;
-  message?: string;
+  updated_at: string;
+  message?: string | null;
   student?: {
     name: string;
     email: string;
@@ -44,9 +36,6 @@ const OwnerDashboard = () => {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [hostelToDelete, setHostelToDelete] = useState<string | null>(null);
-  
   // Redirect if not authenticated or not an owner
   useEffect(() => {
     if (!isAuthenticated) {
@@ -55,7 +44,7 @@ const OwnerDashboard = () => {
       return;
     }
     
-    if (user?.role !== "owner" && user?.role !== "admin") {
+    if (user?.role !== "owner") {
       const redirectPath = user?.role === "student" ? "/student-dashboard" : "/admin-dashboard";
       toast.error(`You don't have access to this page. Redirecting to ${user?.role} dashboard.`);
       navigate(redirectPath);
@@ -63,7 +52,7 @@ const OwnerDashboard = () => {
   }, [isAuthenticated, user, navigate]);
   
   // Fetch owner's hostels
-  const { data: myHostels = [], isLoading: isLoadingHostels } = useQuery({
+  const { data: hostels = [], isLoading: hostelsLoading } = useQuery({
     queryKey: ['ownerHostels', user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -80,9 +69,17 @@ const OwnerDashboard = () => {
           
         if (error) throw error;
         
-        // Transform Supabase data to match Hostel type
         return data.map(hostel => {
-          const amenities = hostel.amenities?.[0] || {};
+          const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
+            wifi: false,
+            water: false,
+            electricity: false,
+            security: false,
+            furniture: false,
+            kitchen: false,
+            bathroom: false
+          };
+          
           const images = hostel.hostel_images || [];
           
           return {
@@ -94,20 +91,20 @@ const OwnerDashboard = () => {
             rooms: hostel.rooms,
             ownerId: hostel.owner_id,
             amenities: {
-              wifi: amenities.wifi || false,
-              water: amenities.water || false,
-              electricity: amenities.electricity || false,
-              security: amenities.security || false,
-              furniture: amenities.furniture || false,
-              kitchen: amenities.kitchen || false,
-              bathroom: amenities.bathroom || false,
+              wifi: amenitiesData.wifi || false,
+              water: amenitiesData.water || false,
+              electricity: amenitiesData.electricity || false,
+              security: amenitiesData.security || false,
+              furniture: amenitiesData.furniture || false,
+              kitchen: amenitiesData.kitchen || false,
+              bathroom: amenitiesData.bathroom || false,
             },
-            images: images.map((img: any) => img.image_url),
+            images: images.map(img => img.image_url),
             createdAt: hostel.created_at
           };
         });
       } catch (error) {
-        console.error("Error loading owner hostels:", error);
+        console.error("Error fetching hostels:", error);
         toast.error("Failed to load your hostels");
         return [];
       }
@@ -115,174 +112,143 @@ const OwnerDashboard = () => {
     enabled: !!user && isAuthenticated
   });
   
-  // Fetch booking requests for owner's hostels
-  const { data: bookingRequests = [], isLoading: isLoadingBookings } = useQuery({
+  // Fetch booking requests for this owner's hostels
+  const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['ownerBookings', user?.id],
     queryFn: async () => {
-      if (!user) return [];
+      if (!user) return [] as BookingRequest[];
       
       try {
-        // Get all hostels owned by this user
-        const { data: hostels, error: hostelsError } = await supabase
+        // Get all hostels for this owner
+        const { data: ownerHostels, error: hostelsError } = await supabase
           .from('hostels')
-          .select('id, name')
+          .select('id')
           .eq('owner_id', user.id);
           
         if (hostelsError) throw hostelsError;
         
-        if (hostels.length === 0) {
-          return [];
-        }
+        if (!ownerHostels.length) return [] as BookingRequest[];
         
-        // Get booking requests for these hostels
-        const hostelIds = hostels.map(h => h.id);
-        const { data: bookings, error: bookingsError } = await supabase
+        // Get all bookings for these hostels
+        const hostelIds = ownerHostels.map(h => h.id);
+        const { data: bookingData, error: bookingsError } = await supabase
           .from('bookings')
           .select('*')
           .in('hostel_id', hostelIds);
           
         if (bookingsError) throw bookingsError;
         
-        // Get student information
+        // Get student and hostel info for each booking
         const bookingsWithDetails = await Promise.all(
-          bookings.map(async (booking) => {
-            // Get student details
-            const { data: student, error: studentError } = await supabase
+          bookingData.map(async (booking) => {
+            // Get student info
+            const { data: studentData } = await supabase
               .from('profiles')
-              .select('full_name, phone_number, id')
+              .select('*')
               .eq('id', booking.student_id)
               .single();
               
-            // Get hostel name
-            const hostel = hostels.find(h => h.id === booking.hostel_id);
-            
-            let studentDetails = {
-              name: "Unknown",
-              email: "Unknown",
-              phone: "Unknown"
+            // Get hostel info
+            const { data: hostelData } = await supabase
+              .from('hostels')
+              .select('name')
+              .eq('id', booking.hostel_id)
+              .single();
+              
+            const student = studentData ? {
+              name: studentData.full_name,
+              email: "student@example.com", // This would come from auth users table
+              phone: studentData.phone_number || "Not provided"
+            } : {
+              name: "Unknown Student",
+              email: "unknown@example.com",
+              phone: "Not provided"
             };
             
-            if (!studentError && student) {
-              // Get user email from auth
-              const { data: authUser } = await supabase.auth.admin.getUserById(student.id);
-              
-              studentDetails = {
-                name: student.full_name,
-                email: authUser?.user?.email || "Unknown",
-                phone: student.phone_number || "Unknown"
-              };
-            }
+            const hostel = hostelData ? {
+              name: hostelData.name
+            } : {
+              name: "Unknown Hostel"
+            };
             
             return {
               ...booking,
-              student: studentDetails,
-              hostel: { 
-                name: hostel?.name || "Unknown Hostel"
-              }
-            };
+              status: booking.status as "pending" | "approved" | "rejected",
+              student,
+              hostel
+            } as BookingRequest;
           })
         );
         
         return bookingsWithDetails;
       } catch (error) {
-        console.error("Error loading booking requests:", error);
+        console.error("Error fetching bookings:", error);
         toast.error("Failed to load booking requests");
-        return [];
+        return [] as BookingRequest[];
       }
     },
     enabled: !!user && isAuthenticated
   });
   
-  // Delete hostel mutation
-  const deleteHostelMutation = useMutation({
-    mutationFn: async (hostelId: string) => {
-      // Delete hostel (cascade deletion will handle amenities, images, and bookings)
-      const { error } = await supabase
-        .from('hostels')
-        .delete()
-        .eq('id', hostelId)
-        .eq('owner_id', user?.id);
-        
-      if (error) throw error;
-      return hostelId;
-    },
-    onSuccess: (hostelId) => {
-      queryClient.invalidateQueries({ queryKey: ['ownerHostels', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
-      toast.success("Hostel deleted successfully");
-      setDeleteDialogOpen(false);
-      setHostelToDelete(null);
-    },
-    onError: (error) => {
-      console.error("Error deleting hostel:", error);
-      toast.error("Failed to delete hostel");
-      setDeleteDialogOpen(false);
-      setHostelToDelete(null);
-    }
-  });
-  
-  // Update booking status mutation
-  const updateBookingStatusMutation = useMutation({
-    mutationFn: async ({ bookingId, newStatus }: { bookingId: string; newStatus: "approved" | "rejected" }) => {
-      const { error } = await supabase
+  // Approve or reject booking
+  const updateBookingMutation = useMutation({
+    mutationFn: async ({ 
+      bookingId, 
+      status 
+    }: { 
+      bookingId: string; 
+      status: "approved" | "rejected" 
+    }) => {
+      const { data, error } = await supabase
         .from('bookings')
-        .update({ status: newStatus })
-        .eq('id', bookingId);
+        .update({ status })
+        .eq('id', bookingId)
+        .select();
         
       if (error) throw error;
-      return { bookingId, newStatus };
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
-      toast.success("Booking status updated");
+      toast.success("Booking request updated");
     },
     onError: (error) => {
-      console.error("Error updating booking status:", error);
-      toast.error("Failed to update booking status");
+      console.error("Error updating booking:", error);
+      toast.error("Failed to update booking request");
     }
   });
   
-  // Handle hostel deletion
-  const openDeleteDialog = (hostelId: string) => {
-    setHostelToDelete(hostelId);
-    setDeleteDialogOpen(true);
+  const approveBooking = (bookingId: string) => {
+    updateBookingMutation.mutate({ bookingId, status: "approved" });
   };
   
-  const deleteHostel = () => {
-    if (!hostelToDelete) return;
-    deleteHostelMutation.mutate(hostelToDelete);
+  const rejectBooking = (bookingId: string) => {
+    updateBookingMutation.mutate({ bookingId, status: "rejected" });
   };
-  
-  // Handle booking request actions
-  const updateBookingStatus = (bookingId: string, newStatus: "approved" | "rejected") => {
-    updateBookingStatusMutation.mutate({ bookingId, newStatus });
-  };
-  
-  const isLoading = isLoadingHostels || isLoadingBookings;
   
   // Group bookings by status
-  const pendingBookings = bookingRequests.filter((booking) => booking.status === "pending");
-  const approvedBookings = bookingRequests.filter((booking) => booking.status === "approved");
-  const rejectedBookings = bookingRequests.filter((booking) => booking.status === "rejected");
+  const pendingBookings = bookings.filter((booking) => booking.status === "pending");
+  const approvedBookings = bookings.filter((booking) => booking.status === "approved");
+  const rejectedBookings = bookings.filter((booking) => booking.status === "rejected");
+  
+  const isLoading = hostelsLoading || bookingsLoading;
+  
   
   return (
     <div className="min-h-screen bg-secondary/10">
       <Navbar />
       
       <div className="container mx-auto px-4 py-12 mt-16">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Owner Dashboard</h1>
             <p className="text-muted-foreground">
-              Manage your hostel listings and booking requests
+              Manage your hostels and booking requests
             </p>
           </div>
           
-          <Button 
-            onClick={() => navigate("/hostel-create")}
-            className="mt-4 md:mt-0"
-          >
-            <Plus size={16} className="mr-1" />
+          <Button onClick={() => navigate("/hostel-create")} className="mt-4 md:mt-0">
+            <Plus size={16} className="mr-2" />
             Add New Hostel
           </Button>
         </div>
@@ -294,20 +260,8 @@ const OwnerDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="flex justify-between items-end">
-                <div className="text-3xl font-bold">{myHostels.length}</div>
-                <Home className="text-muted-foreground" size={24} />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Booking Requests</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-end">
-                <div className="text-3xl font-bold">{bookingRequests.length}</div>
-                <UserCheck className="text-primary" size={24} />
+                <div className="text-3xl font-bold">{hostels.length}</div>
+                <Home className="text-primary/60" size={24} />
               </div>
             </CardContent>
           </Card>
@@ -323,254 +277,168 @@ const OwnerDashboard = () => {
               </div>
             </CardContent>
           </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Approved Bookings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between items-end">
+                <div className="text-3xl font-bold">{approvedBookings.length}</div>
+                <Check className="text-green-500" size={24} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
         
-        <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden mb-8">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-xl font-semibold">Your Hostel Listings</h2>
-            <p className="text-muted-foreground">Manage your property listings</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="p-6 border-b border-border">
+                <h2 className="text-xl font-semibold">Booking Requests</h2>
+                <p className="text-muted-foreground">Manage and track your hostel booking requests</p>
+              </div>
+              
+              {isLoading ? (
+                <div className="p-6">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-12 bg-secondary rounded-md"></div>
+                    <div className="h-48 bg-secondary rounded-md"></div>
+                    <div className="h-48 bg-secondary rounded-md"></div>
+                  </div>
+                </div>
+              ) : bookings.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
+                    <Clock size={24} className="text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-1">No Booking Requests Yet</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                    You haven't received any booking requests for your hostels yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <Tabs defaultValue="all">
+                    <TabsList className="mb-6">
+                      <TabsTrigger value="all">
+                        All ({bookings.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="pending">
+                        Pending ({pendingBookings.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="approved">
+                        Approved ({approvedBookings.length})
+                      </TabsTrigger>
+                      <TabsTrigger value="rejected">
+                        Rejected ({rejectedBookings.length})
+                      </TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="all">
+                      <BookingsList filteredBookings={bookings} />
+                    </TabsContent>
+                    
+                    <TabsContent value="pending">
+                      <BookingsList filteredBookings={pendingBookings} />
+                    </TabsContent>
+                    
+                    <TabsContent value="approved">
+                      <BookingsList filteredBookings={approvedBookings} />
+                    </TabsContent>
+                    
+                    <TabsContent value="rejected">
+                      <BookingsList filteredBookings={rejectedBookings} />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              )}
+            </div>
           </div>
           
-          {isLoading ? (
-            <div className="p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-12 bg-secondary rounded-md"></div>
-                <div className="h-32 bg-secondary rounded-md"></div>
-                <div className="h-32 bg-secondary rounded-md"></div>
+          <div className="space-y-8">
+            <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="p-6 border-b border-border">
+                <h2 className="text-xl font-semibold">Your Hostels</h2>
+                <p className="text-muted-foreground">Manage your listed hostels</p>
               </div>
+              
+              {isLoading ? (
+                <div className="p-6">
+                  <div className="animate-pulse space-y-4">
+                    <div className="h-36 bg-secondary rounded-md"></div>
+                    <div className="h-36 bg-secondary rounded-md"></div>
+                  </div>
+                </div>
+              ) : hostels.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
+                    <Home size={24} className="text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium mb-1">No Hostels Listed</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                    You haven't added any hostels yet. Add your first hostel to start receiving bookings.
+                  </p>
+                  <Button onClick={() => navigate("/hostel-create")}>
+                    <Plus size={16} className="mr-2" />
+                    Add Hostel
+                  </Button>
+                </div>
+              ) : (
+                <div className="p-6 space-y-4">
+                  {hostels.map((hostel) => (
+                    <HostelCard key={hostel.id} hostel={hostel} compact />
+                  ))}
+                  
+                  <div className="pt-4">
+                    <Button
+                      onClick={() => navigate("/hostel-create")}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Plus size={16} className="mr-2" />
+                      Add Another Hostel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : myHostels.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
-                <Home size={24} className="text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No Hostels Listed</h3>
-              <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                You haven't listed any hostels yet. Add your first hostel to start receiving booking requests.
-              </p>
-              <Button onClick={() => navigate("/hostel-create")}>
-                <Plus size={16} className="mr-1" />
-                Add Hostel
-              </Button>
-            </div>
-          ) : (
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="py-3 px-4 text-left font-medium text-muted-foreground">Hostel Name</th>
-                      <th className="py-3 px-4 text-left font-medium text-muted-foreground">Location</th>
-                      <th className="py-3 px-4 text-left font-medium text-muted-foreground">Price/Month</th>
-                      <th className="py-3 px-4 text-left font-medium text-muted-foreground">Rooms</th>
-                      <th className="py-3 px-4 text-left font-medium text-muted-foreground">Bookings</th>
-                      <th className="py-3 px-4 text-right font-medium text-muted-foreground">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {myHostels.map((hostel) => {
-                      const hostelBookings = bookingRequests.filter(
-                        (booking) => booking.hostel_id === hostel.id
-                      );
-                      const pendingCount = hostelBookings.filter(
-                        (booking) => booking.status === "pending"
-                      ).length;
-                      
-                      return (
-                        <tr key={hostel.id} className="border-b border-border hover:bg-secondary/5">
-                          <td className="py-4 px-4">
-                            <div className="font-medium">{hostel.name}</div>
-                          </td>
-                          <td className="py-4 px-4">{hostel.location}</td>
-                          <td className="py-4 px-4">${hostel.price}</td>
-                          <td className="py-4 px-4">{hostel.rooms}</td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center">
-                              <span className="mr-2">{hostelBookings.length}</span>
-                              {pendingCount > 0 && (
-                                <Badge variant="outline" className="bg-amber-100 text-amber-800">
-                                  {pendingCount} pending
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 text-right">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => navigate(`/hostel/${hostel.id}`)}
-                              >
-                                View
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => navigate(`/hostel-edit/${hostel.id}`)}
-                              >
-                                <Edit size={14} className="mr-1" />
-                                Edit
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openDeleteDialog(hostel.id)}
-                                className="text-red-600 border-red-200 hover:bg-red-50"
-                              >
-                                <Trash size={14} className="mr-1" />
-                                Delete
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden mb-8">
-          <div className="p-6 border-b border-border">
-            <h2 className="text-xl font-semibold">Booking Requests</h2>
-            <p className="text-muted-foreground">Manage incoming requests from students</p>
           </div>
-          
-          {isLoading ? (
-            <div className="p-6">
-              <div className="animate-pulse space-y-4">
-                <div className="h-12 bg-secondary rounded-md"></div>
-                <div className="h-32 bg-secondary rounded-md"></div>
-                <div className="h-32 bg-secondary rounded-md"></div>
-              </div>
-            </div>
-          ) : bookingRequests.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
-                <User size={24} className="text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-1">No Booking Requests</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                You haven't received any booking requests yet. Check back later.
-              </p>
-            </div>
-          ) : (
-            <div className="p-6">
-              <Tabs defaultValue="all">
-                <TabsList className="mb-6">
-                  <TabsTrigger value="all">
-                    All ({bookingRequests.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="pending">
-                    Pending ({pendingBookings.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="approved">
-                    Approved ({approvedBookings.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="rejected">
-                    Rejected ({rejectedBookings.length})
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="all">
-                  <BookingRequestsList 
-                    bookings={bookingRequests} 
-                    updateStatus={updateBookingStatus} 
-                  />
-                </TabsContent>
-                
-                <TabsContent value="pending">
-                  <BookingRequestsList 
-                    bookings={pendingBookings} 
-                    updateStatus={updateBookingStatus} 
-                  />
-                </TabsContent>
-                
-                <TabsContent value="approved">
-                  <BookingRequestsList 
-                    bookings={approvedBookings} 
-                    updateStatus={updateBookingStatus} 
-                  />
-                </TabsContent>
-                
-                <TabsContent value="rejected">
-                  <BookingRequestsList 
-                    bookings={rejectedBookings} 
-                    updateStatus={updateBookingStatus} 
-                  />
-                </TabsContent>
-              </Tabs>
-            </div>
-          )}
         </div>
       </div>
-      
-      {/* Delete Hostel Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Hostel</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this hostel? This action cannot be undone,
-              and all associated booking requests will also be deleted.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={deleteHostel}
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
 
-const BookingRequestsList = ({ 
-  bookings, 
-  updateStatus 
-}: { 
-  bookings: BookingRequest[];
-  updateStatus: (bookingId: string, status: "approved" | "rejected") => void;
-}) => {
-  if (bookings.length === 0) {
+// Booking list component
+const BookingsList = ({ filteredBookings }: { filteredBookings: BookingRequest[] }) => {
+  const navigate = useNavigate();
+  
+  if (filteredBookings.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-muted-foreground">No booking requests found</p>
+        <p className="text-muted-foreground">No bookings found</p>
       </div>
     );
   }
   
   return (
     <div className="space-y-4">
-      {bookings.map((booking) => (
-        <Card key={booking.id}>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row justify-between mb-4">
+      {filteredBookings.map((booking) => (
+        <Card key={booking.id} className="overflow-hidden">
+          <div className="p-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-3">
               <div>
-                <div className="flex items-center mb-1">
-                  <Home size={16} className="text-primary mr-1" />
-                  <h3 className="font-semibold">{booking.hostel?.name}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Requested on {new Date(booking.created_at).toLocaleDateString()}
+                <h3 className="font-semibold">
+                  For: {booking.hostel?.name || "Unknown Hostel"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  From: {booking.student?.name || "Unknown Student"}
                 </p>
               </div>
               
               <Badge
-                className={`self-start md:self-center mb-3 md:mb-0 ${
+                className={`mt-2 md:mt-0 ${
                   booking.status === "pending"
                     ? "bg-amber-100 text-amber-800"
                     : booking.status === "approved"
@@ -596,47 +464,107 @@ const BookingRequestsList = ({
               </Badge>
             </div>
             
-            <div className="bg-secondary/20 rounded-md p-4 mb-4">
-              <h4 className="font-medium mb-2">Student Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-y-2 gap-x-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p>{booking.student?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p>{booking.student?.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p>{booking.student?.phone}</p>
-                </div>
-              </div>
+            <div className="text-xs text-muted-foreground mb-3">
+              Requested on {new Date(booking.created_at).toLocaleDateString()}
             </div>
             
-            {booking.status === "pending" && (
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => updateStatus(booking.id, "rejected")}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                >
-                  <X size={16} className="mr-1" />
-                  Reject
-                </Button>
-                <Button
-                  onClick={() => updateStatus(booking.id, "approved")}
-                >
-                  <Check size={16} className="mr-1" />
-                  Approve
-                </Button>
+            {booking.message && (
+              <div className="bg-muted p-3 rounded-md mb-3 text-sm">
+                <p className="font-medium text-xs mb-1">Message from student:</p>
+                <p>{booking.message}</p>
               </div>
             )}
-          </CardContent>
+            
+            <div className="flex flex-wrap gap-2">
+              {booking.status === "pending" && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-200 text-green-600 hover:bg-green-50"
+                    onClick={() => approveBooking(booking.id)}
+                  >
+                    <Check size={14} className="mr-1" />
+                    Approve
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={() => rejectBooking(booking.id)}
+                  >
+                    <X size={14} className="mr-1" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/hostel/${booking.hostel_id}`)}
+              >
+                <ExternalLink size={14} className="mr-1" />
+                View Hostel
+              </Button>
+            </div>
+          </div>
         </Card>
       ))}
     </div>
   );
+};
+
+// Helper functions
+const approveBooking = (bookingId: string) => {
+  // This will be called from the BookingsList component
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  const updateBooking = async () => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'approved' })
+        .eq('id', bookingId);
+        
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
+      toast.success("Booking approved successfully");
+    } catch (error) {
+      console.error("Error approving booking:", error);
+      toast.error("Failed to approve booking");
+    }
+  };
+  
+  updateBooking();
+};
+
+const rejectBooking = (bookingId: string) => {
+  // This will be called from the BookingsList component
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  const updateBooking = async () => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'rejected' })
+        .eq('id', bookingId);
+        
+      if (error) throw error;
+      
+      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
+      toast.success("Booking rejected");
+    } catch (error) {
+      console.error("Error rejecting booking:", error);
+      toast.error("Failed to reject booking");
+    }
+  };
+  
+  updateBooking();
 };
 
 export default OwnerDashboard;
