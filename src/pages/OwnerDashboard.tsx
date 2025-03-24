@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -18,29 +19,22 @@ import { toast } from "sonner";
 import { Home, Clock, Check, X, Edit, Trash, Plus, UserCheck, User } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { Hostel } from "../components/HostelCard";
-
-// Storage keys
-const HOSTELS_STORAGE_KEY = "hostel_listings";
-const BOOKINGS_STORAGE_KEY = "hostel_bookings";
-const USERS_STORAGE_KEY = "hostel_users";
+import { supabase } from "../integrations/supabase/client";
 
 // Type for booking requests
 interface BookingRequest {
   id: string;
-  hostelId: string;
-  studentId: string;
-  ownerId: string;
+  hostel_id: string;
+  student_id: string;
   status: "pending" | "approved" | "rejected";
-  createdAt: string;
-}
-
-interface BookingWithStudent extends BookingRequest {
-  student: {
+  created_at: string;
+  message?: string;
+  student?: {
     name: string;
     email: string;
     phone: string;
   };
-  hostel: {
+  hostel?: {
     name: string;
   };
 }
@@ -48,10 +42,8 @@ interface BookingWithStudent extends BookingRequest {
 const OwnerDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
   
-  const [myHostels, setMyHostels] = useState<Hostel[]>([]);
-  const [bookingRequests, setBookingRequests] = useState<BookingWithStudent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [hostelToDelete, setHostelToDelete] = useState<string | null>(null);
   
@@ -70,66 +62,185 @@ const OwnerDashboard = () => {
     }
   }, [isAuthenticated, user, navigate]);
   
-  // Fetch owner hostels and booking requests
-  useEffect(() => {
-    if (!isAuthenticated || !user) return;
-    
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+  // Fetch owner's hostels
+  const { data: myHostels = [], isLoading: isLoadingHostels } = useQuery({
+    queryKey: ['ownerHostels', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
       try {
-        // Get all hostels
-        const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-        const allHostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
+        const { data, error } = await supabase
+          .from('hostels')
+          .select(`
+            *,
+            amenities (*),
+            hostel_images (*)
+          `)
+          .eq('owner_id', user.id);
+          
+        if (error) throw error;
         
-        // Filter hostels owned by this user
-        const ownerHostels = Object.values(allHostels).filter(
-          (hostel) => hostel.ownerId === user.id
-        );
-        
-        setMyHostels(ownerHostels);
-        
-        // Get booking requests for owner's hostels
-        const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-        const allBookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
-        
-        const ownerBookings = Object.values(allBookings).filter(
-          (booking) => booking.ownerId === user.id
-        );
-        
-        // Get student information for each booking
-        const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-        const users = usersJson ? JSON.parse(usersJson) : {};
-        
-        const bookingsWithStudents = ownerBookings.map((booking) => {
-          const student = users[booking.studentId];
-          const hostel = allHostels[booking.hostelId];
+        // Transform Supabase data to match Hostel type
+        return data.map(hostel => {
+          const amenities = hostel.amenities?.[0] || {};
+          const images = hostel.hostel_images || [];
           
           return {
-            ...booking,
-            student: student
-              ? {
-                  name: student.name,
-                  email: student.email,
-                  phone: student.phone,
-                }
-              : { name: "Unknown", email: "Unknown", phone: "Unknown" },
-            hostel: hostel
-              ? { name: hostel.name }
-              : { name: "Unknown Hostel" },
+            id: hostel.id,
+            name: hostel.name,
+            location: hostel.location,
+            description: hostel.description || '',
+            price: hostel.price,
+            rooms: hostel.rooms,
+            ownerId: hostel.owner_id,
+            amenities: {
+              wifi: amenities.wifi || false,
+              water: amenities.water || false,
+              electricity: amenities.electricity || false,
+              security: amenities.security || false,
+              furniture: amenities.furniture || false,
+              kitchen: amenities.kitchen || false,
+              bathroom: amenities.bathroom || false,
+            },
+            images: images.map((img: any) => img.image_url),
+            createdAt: hostel.created_at
           };
         });
-        
-        setBookingRequests(bookingsWithStudents);
       } catch (error) {
-        console.error("Error loading dashboard data:", error);
-        toast.error("Failed to load dashboard data");
-      } finally {
-        setIsLoading(false);
+        console.error("Error loading owner hostels:", error);
+        toast.error("Failed to load your hostels");
+        return [];
       }
-    }, 800);
-  }, [isAuthenticated, user]);
+    },
+    enabled: !!user && isAuthenticated
+  });
+  
+  // Fetch booking requests for owner's hostels
+  const { data: bookingRequests = [], isLoading: isLoadingBookings } = useQuery({
+    queryKey: ['ownerBookings', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      try {
+        // Get all hostels owned by this user
+        const { data: hostels, error: hostelsError } = await supabase
+          .from('hostels')
+          .select('id, name')
+          .eq('owner_id', user.id);
+          
+        if (hostelsError) throw hostelsError;
+        
+        if (hostels.length === 0) {
+          return [];
+        }
+        
+        // Get booking requests for these hostels
+        const hostelIds = hostels.map(h => h.id);
+        const { data: bookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select('*')
+          .in('hostel_id', hostelIds);
+          
+        if (bookingsError) throw bookingsError;
+        
+        // Get student information
+        const bookingsWithDetails = await Promise.all(
+          bookings.map(async (booking) => {
+            // Get student details
+            const { data: student, error: studentError } = await supabase
+              .from('profiles')
+              .select('full_name, phone_number, id')
+              .eq('id', booking.student_id)
+              .single();
+              
+            // Get hostel name
+            const hostel = hostels.find(h => h.id === booking.hostel_id);
+            
+            let studentDetails = {
+              name: "Unknown",
+              email: "Unknown",
+              phone: "Unknown"
+            };
+            
+            if (!studentError && student) {
+              // Get user email from auth
+              const { data: authUser } = await supabase.auth.admin.getUserById(student.id);
+              
+              studentDetails = {
+                name: student.full_name,
+                email: authUser?.user?.email || "Unknown",
+                phone: student.phone_number || "Unknown"
+              };
+            }
+            
+            return {
+              ...booking,
+              student: studentDetails,
+              hostel: { 
+                name: hostel?.name || "Unknown Hostel"
+              }
+            };
+          })
+        );
+        
+        return bookingsWithDetails;
+      } catch (error) {
+        console.error("Error loading booking requests:", error);
+        toast.error("Failed to load booking requests");
+        return [];
+      }
+    },
+    enabled: !!user && isAuthenticated
+  });
+  
+  // Delete hostel mutation
+  const deleteHostelMutation = useMutation({
+    mutationFn: async (hostelId: string) => {
+      // Delete hostel (cascade deletion will handle amenities, images, and bookings)
+      const { error } = await supabase
+        .from('hostels')
+        .delete()
+        .eq('id', hostelId)
+        .eq('owner_id', user?.id);
+        
+      if (error) throw error;
+      return hostelId;
+    },
+    onSuccess: (hostelId) => {
+      queryClient.invalidateQueries({ queryKey: ['ownerHostels', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
+      toast.success("Hostel deleted successfully");
+      setDeleteDialogOpen(false);
+      setHostelToDelete(null);
+    },
+    onError: (error) => {
+      console.error("Error deleting hostel:", error);
+      toast.error("Failed to delete hostel");
+      setDeleteDialogOpen(false);
+      setHostelToDelete(null);
+    }
+  });
+  
+  // Update booking status mutation
+  const updateBookingStatusMutation = useMutation({
+    mutationFn: async ({ bookingId, newStatus }: { bookingId: string; newStatus: "approved" | "rejected" }) => {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: newStatus })
+        .eq('id', bookingId);
+        
+      if (error) throw error;
+      return { bookingId, newStatus };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
+      toast.success("Booking status updated");
+    },
+    onError: (error) => {
+      console.error("Error updating booking status:", error);
+      toast.error("Failed to update booking status");
+    }
+  });
   
   // Handle hostel deletion
   const openDeleteDialog = (hostelId: string) => {
@@ -139,76 +250,15 @@ const OwnerDashboard = () => {
   
   const deleteHostel = () => {
     if (!hostelToDelete) return;
-    
-    try {
-      // Get all hostels
-      const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-      const allHostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
-      
-      // Remove this hostel
-      delete allHostels[hostelToDelete];
-      
-      // Save back to localStorage
-      localStorage.setItem(HOSTELS_STORAGE_KEY, JSON.stringify(allHostels));
-      
-      // Also remove any bookings for this hostel
-      const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-      const allBookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
-      
-      const updatedBookings = Object.entries(allBookings).reduce((acc, [id, booking]) => {
-        if (booking.hostelId !== hostelToDelete) {
-          acc[id] = booking;
-        }
-        return acc;
-      }, {} as Record<string, BookingRequest>);
-      
-      localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(updatedBookings));
-      
-      // Update state
-      setMyHostels(myHostels.filter((hostel) => hostel.id !== hostelToDelete));
-      setBookingRequests(bookingRequests.filter((booking) => booking.hostelId !== hostelToDelete));
-      
-      toast.success("Hostel deleted successfully");
-    } catch (error) {
-      console.error("Error deleting hostel:", error);
-      toast.error("Failed to delete hostel");
-    } finally {
-      setDeleteDialogOpen(false);
-      setHostelToDelete(null);
-    }
+    deleteHostelMutation.mutate(hostelToDelete);
   };
   
   // Handle booking request actions
   const updateBookingStatus = (bookingId: string, newStatus: "approved" | "rejected") => {
-    try {
-      // Get all bookings
-      const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-      const allBookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
-      
-      // Update this booking's status
-      allBookings[bookingId] = {
-        ...allBookings[bookingId],
-        status: newStatus,
-      };
-      
-      // Save back to localStorage
-      localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(allBookings));
-      
-      // Update state
-      setBookingRequests(
-        bookingRequests.map((booking) =>
-          booking.id === bookingId
-            ? { ...booking, status: newStatus }
-            : booking
-        )
-      );
-      
-      toast.success(`Booking request ${newStatus}`);
-    } catch (error) {
-      console.error(`Error updating booking status:`, error);
-      toast.error("Failed to update booking status");
-    }
+    updateBookingStatusMutation.mutate({ bookingId, newStatus });
   };
+  
+  const isLoading = isLoadingHostels || isLoadingBookings;
   
   // Group bookings by status
   const pendingBookings = bookingRequests.filter((booking) => booking.status === "pending");
@@ -320,7 +370,7 @@ const OwnerDashboard = () => {
                   <tbody>
                     {myHostels.map((hostel) => {
                       const hostelBookings = bookingRequests.filter(
-                        (booking) => booking.hostelId === hostel.id
+                        (booking) => booking.hostel_id === hostel.id
                       );
                       const pendingCount = hostelBookings.filter(
                         (booking) => booking.status === "pending"
@@ -492,7 +542,7 @@ const BookingRequestsList = ({
   bookings, 
   updateStatus 
 }: { 
-  bookings: BookingWithStudent[];
+  bookings: BookingRequest[];
   updateStatus: (bookingId: string, status: "approved" | "rejected") => void;
 }) => {
   if (bookings.length === 0) {
@@ -512,10 +562,10 @@ const BookingRequestsList = ({
               <div>
                 <div className="flex items-center mb-1">
                   <Home size={16} className="text-primary mr-1" />
-                  <h3 className="font-semibold">{booking.hostel.name}</h3>
+                  <h3 className="font-semibold">{booking.hostel?.name}</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Requested on {new Date(booking.createdAt).toLocaleDateString()}
+                  Requested on {new Date(booking.created_at).toLocaleDateString()}
                 </p>
               </div>
               
@@ -551,15 +601,15 @@ const BookingRequestsList = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-y-2 gap-x-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Name</p>
-                  <p>{booking.student.name}</p>
+                  <p>{booking.student?.name}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Email</p>
-                  <p>{booking.student.email}</p>
+                  <p>{booking.student?.email}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Phone</p>
-                  <p>{booking.student.phone}</p>
+                  <p>{booking.student?.phone}</p>
                 </div>
               </div>
             </div>

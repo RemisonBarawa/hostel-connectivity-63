@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -10,9 +11,8 @@ import { Slider } from "../components/ui/slider";
 import { Search, MapPin, SlidersHorizontal, X } from "lucide-react";
 import HostelCard, { Hostel } from "../components/HostelCard";
 import Navbar from "../components/Navbar";
-
-// Storage key for hostels
-const HOSTELS_STORAGE_KEY = "hostel_listings";
+import { supabase } from "../integrations/supabase/client";
+import { toast } from "sonner";
 
 const HostelSearch = () => {
   const navigate = useNavigate();
@@ -38,60 +38,82 @@ const HostelSearch = () => {
     },
   });
   
-  // States for search results and UI
-  const [hostels, setHostels] = useState<Hostel[]>([]);
-  const [filteredHostels, setFilteredHostels] = useState<Hostel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
+  // Fetch hostels from Supabase
+  const { data: hostels = [], isLoading } = useQuery({
+    queryKey: ['hostels'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('hostels')
+          .select(`
+            *,
+            amenities (*),
+            hostel_images (*)
+          `);
+        
+        if (error) throw error;
+        
+        // Transform Supabase data to match Hostel type
+        return data.map(hostel => {
+          const amenities = hostel.amenities?.[0] || {};
+          const images = hostel.hostel_images || [];
+          
+          return {
+            id: hostel.id,
+            name: hostel.name,
+            location: hostel.location,
+            description: hostel.description || '',
+            price: hostel.price,
+            rooms: hostel.rooms,
+            ownerId: hostel.owner_id,
+            amenities: {
+              wifi: amenities.wifi || false,
+              water: amenities.water || false,
+              electricity: amenities.electricity || false,
+              security: amenities.security || false,
+              furniture: amenities.furniture || false,
+              kitchen: amenities.kitchen || false,
+              bathroom: amenities.bathroom || false,
+            },
+            images: images.map(img => img.image_url),
+            createdAt: hostel.created_at
+          };
+        });
+      } catch (error) {
+        console.error("Error fetching hostels:", error);
+        toast.error("Failed to load hostels");
+        return [];
+      }
+    }
+  });
   
-  // Load hostels on mount
-  useEffect(() => {
-    // Simulate API call delay
-    setTimeout(() => {
-      // Get hostels from localStorage
-      const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-      const hostelsObj: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
-      
-      // Convert to array
-      const hostelArray = Object.values(hostelsObj);
-      setHostels(hostelArray);
-      setIsLoading(false);
-    }, 500);
-  }, []);
-  
-  // Apply filters whenever search form or hostels change
-  useEffect(() => {
-    if (hostels.length === 0) return;
+  // Apply filters
+  const filteredHostels = hostels.filter((hostel) => {
+    // Filter by location (case insensitive)
+    if (
+      searchForm.location &&
+      !hostel.location.toLowerCase().includes(searchForm.location.toLowerCase())
+    ) {
+      return false;
+    }
     
-    const filtered = hostels.filter((hostel) => {
-      // Filter by location (case insensitive)
-      if (
-        searchForm.location &&
-        !hostel.location.toLowerCase().includes(searchForm.location.toLowerCase())
-      ) {
+    // Filter by price range
+    if (
+      hostel.price < searchForm.minPrice ||
+      hostel.price > searchForm.maxPrice
+    ) {
+      return false;
+    }
+    
+    // Filter by amenities
+    for (const [key, value] of Object.entries(searchForm.amenities)) {
+      if (value && !hostel.amenities?.[key as keyof typeof hostel.amenities]) {
         return false;
       }
-      
-      // Filter by price range
-      if (
-        hostel.price < searchForm.minPrice ||
-        hostel.price > searchForm.maxPrice
-      ) {
-        return false;
-      }
-      
-      // Filter by amenities
-      for (const [key, value] of Object.entries(searchForm.amenities)) {
-        if (value && !hostel.amenities?.[key as keyof typeof hostel.amenities]) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
+    }
     
-    setFilteredHostels(filtered);
-  }, [searchForm, hostels]);
+    return true;
+  });
   
   // Update search params in URL
   useEffect(() => {

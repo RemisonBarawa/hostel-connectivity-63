@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -10,28 +11,23 @@ import { toast } from "sonner";
 import { Home, Clock, Check, X, ExternalLink } from "lucide-react";
 import Navbar from "../components/Navbar";
 import HostelCard, { Hostel } from "../components/HostelCard";
-
-// Storage keys
-const HOSTELS_STORAGE_KEY = "hostel_listings";
-const BOOKINGS_STORAGE_KEY = "hostel_bookings";
+import { supabase } from "../integrations/supabase/client";
 
 // Type for booking requests
 interface BookingRequest {
   id: string;
-  hostelId: string;
-  studentId: string;
-  ownerId: string;
+  hostel_id: string;
+  student_id: string;
   status: "pending" | "approved" | "rejected";
-  createdAt: string;
+  created_at: string;
+  message?: string;
+  hostel?: Hostel;
 }
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  
-  const [hostels, setHostels] = useState<Record<string, Hostel>>({});
-  const [bookings, setBookings] = useState<BookingRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   
   // Redirect if not authenticated or not a student
   useEffect(() => {
@@ -48,61 +44,105 @@ const StudentDashboard = () => {
     }
   }, [isAuthenticated, user, navigate]);
   
-  // Fetch student bookings and hostel data
-  useEffect(() => {
-    if (!isAuthenticated || !user) return;
-    
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+  // Fetch student bookings
+  const { data: bookings = [], isLoading } = useQuery({
+    queryKey: ['studentBookings', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
       try {
-        // Get all hostels
-        const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-        const allHostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
-        setHostels(allHostels);
-        
         // Get bookings for this student
-        const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-        const allBookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select('*')
+          .eq('student_id', user.id);
+          
+        if (bookingError) throw bookingError;
         
-        const studentBookings = Object.values(allBookings).filter(
-          (booking) => booking.studentId === user.id
+        // Get hostel details for each booking
+        const bookingsWithHostels = await Promise.all(
+          bookingData.map(async (booking) => {
+            const { data: hostelData, error: hostelError } = await supabase
+              .from('hostels')
+              .select(`
+                *,
+                amenities (*),
+                hostel_images (*)
+              `)
+              .eq('id', booking.hostel_id)
+              .single();
+              
+            if (hostelError) {
+              console.error("Error fetching hostel:", hostelError);
+              return booking;
+            }
+            
+            const amenities = hostelData.amenities?.[0] || {};
+            const images = hostelData.hostel_images || [];
+            
+            const hostel: Hostel = {
+              id: hostelData.id,
+              name: hostelData.name,
+              location: hostelData.location,
+              description: hostelData.description || '',
+              price: hostelData.price,
+              rooms: hostelData.rooms,
+              ownerId: hostelData.owner_id,
+              amenities: {
+                wifi: amenities.wifi || false,
+                water: amenities.water || false,
+                electricity: amenities.electricity || false,
+                security: amenities.security || false,
+                furniture: amenities.furniture || false,
+                kitchen: amenities.kitchen || false,
+                bathroom: amenities.bathroom || false,
+              },
+              images: images.map((img: any) => img.image_url),
+              createdAt: hostelData.created_at
+            };
+            
+            return {
+              ...booking,
+              hostel
+            };
+          })
         );
         
-        setBookings(studentBookings);
+        return bookingsWithHostels;
       } catch (error) {
         console.error("Error loading dashboard data:", error);
         toast.error("Failed to load dashboard data");
-      } finally {
-        setIsLoading(false);
+        return [];
       }
-    }, 800);
-  }, [isAuthenticated, user]);
+    },
+    enabled: !!user && isAuthenticated
+  });
   
   // Cancel a booking request
-  const cancelBooking = (bookingId: string) => {
-    if (!user) return;
-    
-    try {
-      // Get all bookings
-      const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-      const allBookings: Record<string, BookingRequest> = bookingsJson ? JSON.parse(bookingsJson) : {};
-      
-      // Remove this booking
-      delete allBookings[bookingId];
-      
-      // Save back to localStorage
-      localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(allBookings));
-      
-      // Update state
-      setBookings(bookings.filter((booking) => booking.id !== bookingId));
-      
+  const cancelBookingMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      const { error } = await supabase
+        .from('bookings')
+        .delete()
+        .eq('id', bookingId)
+        .eq('student_id', user?.id)
+        .eq('status', 'pending');
+        
+      if (error) throw error;
+      return bookingId;
+    },
+    onSuccess: (bookingId) => {
+      queryClient.invalidateQueries({ queryKey: ['studentBookings', user?.id] });
       toast.success("Booking request cancelled");
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error("Error cancelling booking:", error);
       toast.error("Failed to cancel booking request");
     }
+  });
+  
+  const cancelBooking = (bookingId: string) => {
+    cancelBookingMutation.mutate(bookingId);
   };
   
   // Group bookings by status
@@ -123,7 +163,7 @@ const StudentDashboard = () => {
     return (
       <div className="space-y-4">
         {filteredBookings.map((booking) => {
-          const hostel = hostels[booking.hostelId];
+          const hostel = booking.hostel;
           
           return (
             <Card key={booking.id} className="overflow-hidden">
@@ -172,7 +212,7 @@ const StudentDashboard = () => {
                   </div>
                   
                   <div className="text-xs text-muted-foreground mb-3">
-                    Requested on {new Date(booking.createdAt).toLocaleDateString()}
+                    Requested on {new Date(booking.created_at).toLocaleDateString()}
                   </div>
                   
                   <div className="mt-auto flex justify-end space-x-2 pt-4">
@@ -190,7 +230,7 @@ const StudentDashboard = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => navigate(`/hostel/${booking.hostelId}`)}
+                      onClick={() => navigate(`/hostel/${booking.hostel_id}`)}
                     >
                       <ExternalLink size={14} className="mr-1" />
                       View Hostel
