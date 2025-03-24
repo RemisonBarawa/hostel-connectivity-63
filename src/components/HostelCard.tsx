@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -11,14 +10,21 @@ export interface Hostel {
   location: string;
   price: number;
   rooms: number;
+  description?: string;
   amenities: {
     wifi: boolean;
     water: boolean;
     electricity: boolean;
-    [key: string]: boolean;
+    security?: boolean;
+    furniture?: boolean;
+    kitchen?: boolean;
+    bathroom?: boolean;
+    [key: string]: boolean | undefined;
   };
   images: string[];
   ownerId: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface HostelCardProps {
@@ -27,7 +33,7 @@ interface HostelCardProps {
 }
 
 const HostelCard = ({ hostel, compact = false }: HostelCardProps) => {
-  const { id, name, location, price, rooms, amenities, images } = hostel;
+  const { id, name, location, price, rooms, description, amenities, images } = hostel;
   
   // Use placeholder image if none provided
   const imageUrl = images && images.length > 0 
