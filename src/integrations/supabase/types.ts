@@ -9,13 +9,242 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      amenities: {
+        Row: {
+          bathroom: boolean | null
+          electricity: boolean | null
+          furniture: boolean | null
+          hostel_id: string
+          id: string
+          kitchen: boolean | null
+          security: boolean | null
+          water: boolean | null
+          wifi: boolean | null
+        }
+        Insert: {
+          bathroom?: boolean | null
+          electricity?: boolean | null
+          furniture?: boolean | null
+          hostel_id: string
+          id?: string
+          kitchen?: boolean | null
+          security?: boolean | null
+          water?: boolean | null
+          wifi?: boolean | null
+        }
+        Update: {
+          bathroom?: boolean | null
+          electricity?: boolean | null
+          furniture?: boolean | null
+          hostel_id?: string
+          id?: string
+          kitchen?: boolean | null
+          security?: boolean | null
+          water?: boolean | null
+          wifi?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "amenities_hostel_id_fkey"
+            columns: ["hostel_id"]
+            isOneToOne: false
+            referencedRelation: "hostels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          created_at: string
+          hostel_id: string
+          id: string
+          message: string | null
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hostel_id: string
+          id?: string
+          message?: string | null
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hostel_id?: string
+          id?: string
+          message?: string | null
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_hostel_id_fkey"
+            columns: ["hostel_id"]
+            isOneToOne: false
+            referencedRelation: "hostels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hostel_images: {
+        Row: {
+          created_at: string
+          hostel_id: string
+          id: string
+          image_url: string
+          is_primary: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          hostel_id: string
+          id?: string
+          image_url: string
+          is_primary?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          hostel_id?: string
+          id?: string
+          image_url?: string
+          is_primary?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hostel_images_hostel_id_fkey"
+            columns: ["hostel_id"]
+            isOneToOne: false
+            referencedRelation: "hostels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hostels: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          location: string
+          name: string
+          owner_id: string
+          price: number
+          rooms: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location: string
+          name: string
+          owner_id: string
+          price: number
+          rooms: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          location?: string
+          name?: string
+          owner_id?: string
+          price?: number
+          rooms?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hostels_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          read: boolean | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          read?: boolean | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          read?: boolean | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          phone_number: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          full_name: string
+          id: string
+          phone_number?: string | null
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          phone_number?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
