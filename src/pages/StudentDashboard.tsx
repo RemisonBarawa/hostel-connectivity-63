@@ -11,7 +11,6 @@ import { Home, Clock, Check, X, ExternalLink } from "lucide-react";
 import Navbar from "../components/Navbar";
 import HostelCard, { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
-import ProfileEdit from "../components/ProfileEdit";
 
 // Type for booking requests with stricter typing
 interface BookingRequest {
@@ -29,7 +28,6 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState("bookings");
   
   // Redirect if not authenticated or not a student
   useEffect(() => {
@@ -162,6 +160,101 @@ const StudentDashboard = () => {
   const approvedBookings = bookings.filter((booking) => booking.status === "approved");
   const rejectedBookings = bookings.filter((booking) => booking.status === "rejected");
   
+  // Components for different booking statuses
+  const BookingsList = ({ filteredBookings }: { filteredBookings: BookingRequest[] }) => {
+    if (filteredBookings.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">No bookings found</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="space-y-4">
+        {filteredBookings.map((booking) => {
+          const hostel = booking.hostel;
+          
+          return (
+            <Card key={booking.id} className="overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-4">
+                <div className="md:col-span-1">
+                  {hostel && <HostelCard hostel={hostel} compact />}
+                </div>
+                
+                <div className="md:col-span-3 p-4 flex flex-col">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold">
+                        {hostel?.name || "Unknown Hostel"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-1">
+                        {hostel?.location || "Unknown Location"}
+                      </p>
+                      <p className="text-sm font-medium">${hostel?.price}/month</p>
+                    </div>
+                    
+                    <Badge
+                      className={`${
+                        booking.status === "pending"
+                          ? "bg-amber-100 text-amber-800"
+                          : booking.status === "approved"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {booking.status === "pending" && (
+                        <>
+                          <Clock size={14} className="mr-1" /> Pending
+                        </>
+                      )}
+                      {booking.status === "approved" && (
+                        <>
+                          <Check size={14} className="mr-1" /> Approved
+                        </>
+                      )}
+                      {booking.status === "rejected" && (
+                        <>
+                          <X size={14} className="mr-1" /> Rejected
+                        </>
+                      )}
+                    </Badge>
+                  </div>
+                  
+                  <div className="text-xs text-muted-foreground mb-3">
+                    Requested on {new Date(booking.created_at).toLocaleDateString()}
+                  </div>
+                  
+                  <div className="mt-auto flex justify-end space-x-2 pt-4">
+                    {booking.status === "pending" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => cancelBooking(booking.id)}
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                      >
+                        Cancel Request
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/hostel/${booking.hostel_id}`)}
+                    >
+                      <ExternalLink size={14} className="mr-1" />
+                      View Hostel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
+  
   return (
     <div className="min-h-screen bg-secondary/10">
       <Navbar />
@@ -212,81 +305,67 @@ const StudentDashboard = () => {
         
         <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden mb-8">
           <div className="p-6 border-b border-border">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="bookings">
-                  Booking Requests
-                </TabsTrigger>
-                <TabsTrigger value="profile">
-                  My Profile
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <h2 className="text-xl font-semibold">Your Booking Requests</h2>
+            <p className="text-muted-foreground">Manage and track your hostel booking requests</p>
           </div>
           
-          <div className="p-6">
-            <TabsContent value="bookings">
-              {isLoading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-12 bg-secondary rounded-md"></div>
-                  <div className="h-48 bg-secondary rounded-md"></div>
-                  <div className="h-48 bg-secondary rounded-md"></div>
-                </div>
-              ) : bookings.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
-                    <Home size={24} className="text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-1">No Booking Requests</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                    You haven't made any booking requests yet. Start by browsing available hostels.
-                  </p>
-                  <Button onClick={() => navigate("/hostel-search")}>
-                    Find Hostels
-                  </Button>
-                </div>
-              ) : (
-                <div>
-                  <Tabs defaultValue="all">
-                    <TabsList className="mb-6">
-                      <TabsTrigger value="all">
-                        All ({bookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="pending">
-                        Pending ({pendingBookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="approved">
-                        Approved ({approvedBookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="rejected">
-                        Rejected ({rejectedBookings.length})
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="all">
-                      <BookingsList filteredBookings={bookings} cancelBooking={cancelBooking} />
-                    </TabsContent>
-                    
-                    <TabsContent value="pending">
-                      <BookingsList filteredBookings={pendingBookings} cancelBooking={cancelBooking} />
-                    </TabsContent>
-                    
-                    <TabsContent value="approved">
-                      <BookingsList filteredBookings={approvedBookings} cancelBooking={cancelBooking} />
-                    </TabsContent>
-                    
-                    <TabsContent value="rejected">
-                      <BookingsList filteredBookings={rejectedBookings} cancelBooking={cancelBooking} />
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="profile">
-              <ProfileEdit />
-            </TabsContent>
-          </div>
+          {isLoading ? (
+            <div className="p-6">
+              <div className="animate-pulse space-y-4">
+                <div className="h-12 bg-secondary rounded-md"></div>
+                <div className="h-48 bg-secondary rounded-md"></div>
+                <div className="h-48 bg-secondary rounded-md"></div>
+              </div>
+            </div>
+          ) : bookings.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
+                <Home size={24} className="text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-1">No Booking Requests</h3>
+              <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                You haven't made any booking requests yet. Start by browsing available hostels.
+              </p>
+              <Button onClick={() => navigate("/hostel-search")}>
+                Find Hostels
+              </Button>
+            </div>
+          ) : (
+            <div className="p-6">
+              <Tabs defaultValue="all">
+                <TabsList className="mb-6">
+                  <TabsTrigger value="all">
+                    All ({bookings.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="pending">
+                    Pending ({pendingBookings.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="approved">
+                    Approved ({approvedBookings.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected">
+                    Rejected ({rejectedBookings.length})
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="all">
+                  <BookingsList filteredBookings={bookings} />
+                </TabsContent>
+                
+                <TabsContent value="pending">
+                  <BookingsList filteredBookings={pendingBookings} />
+                </TabsContent>
+                
+                <TabsContent value="approved">
+                  <BookingsList filteredBookings={approvedBookings} />
+                </TabsContent>
+                
+                <TabsContent value="rejected">
+                  <BookingsList filteredBookings={rejectedBookings} />
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
         </div>
         
         <div className="flex justify-center">
@@ -301,109 +380,6 @@ const StudentDashboard = () => {
           </Button>
         </div>
       </div>
-    </div>
-  );
-};
-
-// Components for different booking statuses
-const BookingsList = ({ 
-  filteredBookings, 
-  cancelBooking 
-}: { 
-  filteredBookings: BookingRequest[], 
-  cancelBooking: (id: string) => void 
-}) => {
-  const navigate = useNavigate();
-  
-  if (filteredBookings.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">No bookings found</p>
-      </div>
-    );
-  }
-  
-  return (
-    <div className="space-y-4">
-      {filteredBookings.map((booking) => {
-        const hostel = booking.hostel;
-        
-        return (
-          <Card key={booking.id} className="overflow-hidden">
-            <div className="grid grid-cols-1 md:grid-cols-4">
-              <div className="md:col-span-1">
-                {hostel && <HostelCard hostel={hostel} compact />}
-              </div>
-              
-              <div className="md:col-span-3 p-4 flex flex-col">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h3 className="font-semibold">
-                      {hostel?.name || "Unknown Hostel"}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {hostel?.location || "Unknown Location"}
-                    </p>
-                    <p className="text-sm font-medium">${hostel?.price}/month</p>
-                  </div>
-                  
-                  <Badge
-                    className={`${
-                      booking.status === "pending"
-                        ? "bg-amber-100 text-amber-800"
-                        : booking.status === "approved"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-red-100 text-red-800"
-                    }`}
-                  >
-                    {booking.status === "pending" && (
-                      <>
-                        <Clock size={14} className="mr-1" /> Pending
-                      </>
-                    )}
-                    {booking.status === "approved" && (
-                      <>
-                        <Check size={14} className="mr-1" /> Approved
-                      </>
-                    )}
-                    {booking.status === "rejected" && (
-                      <>
-                        <X size={14} className="mr-1" /> Rejected
-                      </>
-                    )}
-                  </Badge>
-                </div>
-                
-                <div className="text-xs text-muted-foreground mb-3">
-                  Requested on {new Date(booking.created_at).toLocaleDateString()}
-                </div>
-                
-                <div className="mt-auto flex justify-end space-x-2 pt-4">
-                  {booking.status === "pending" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => cancelBooking(booking.id)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      Cancel Request
-                    </Button>
-                  )}
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`/hostel/${booking.hostel_id}`)}
-                  >
-                    <ExternalLink size={14} className="mr-1" />
-                    View Hostel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        );
-      })}
     </div>
   );
 };
