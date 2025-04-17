@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth, UserRole } from "../contexts/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -26,6 +25,7 @@ const Auth = () => {
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -62,7 +62,8 @@ const Auth = () => {
       [name]: value,
     });
     
-    // Clear error for this field when user types
+    // Clear errors when typing
+    setServerError(null);
     if (errors[name]) {
       setErrors({
         ...errors,
@@ -98,6 +99,7 @@ const Auth = () => {
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setServerError(null);
     
     if (!validateForm()) {
       toast.error("Please fix the errors in the form");
@@ -119,9 +121,9 @@ const Auth = () => {
           role: formData.role,
         });
       }
-    } catch (error) {
-      // Error is already displayed via toast in the auth context
+    } catch (error: any) {
       console.error("Authentication error:", error);
+      setServerError(error.message || "Authentication failed");
     }
   };
   
@@ -147,6 +149,12 @@ const Auth = () => {
                   : "Join HostelConnect to find or list hostels"}
               </p>
             </div>
+            
+            {serverError && (
+              <div className="p-3 mb-4 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+                {serverError}
+              </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-4">
               {mode === "signup" && (

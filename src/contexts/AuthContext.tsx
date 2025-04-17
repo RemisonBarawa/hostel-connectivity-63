@@ -46,16 +46,6 @@ interface AuthContextType {
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Storage keys for local authentication fallback
-const USERS_STORAGE_KEY = "hostel_users";
-const CURRENT_USER_KEY = "hostel_current_user";
-
-// Helper function to hash password (simplified for demo)
-const hashPassword = (password: string): string => {
-  // In a real app, use a proper hashing library
-  return `hashed_${password}`;
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -91,11 +81,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
           } catch (error) {
             console.error("Error fetching user profile:", error);
-            // Fallback to local storage
-            const storedUser = localStorage.getItem(CURRENT_USER_KEY);
-            if (storedUser) {
-              setUser(JSON.parse(storedUser));
-            }
           }
         } else {
           // Clear user data when logged out
@@ -137,11 +122,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setIsLoading(false);
           });
       } else {
-        // Check local storage as fallback
-        const storedUser = localStorage.getItem(CURRENT_USER_KEY);
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        }
         setIsLoading(false);
       }
     });
@@ -156,7 +136,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     
     try {
-      // Try Supabase authentication first
       const { data, error } = await supabase.auth.signInWithPassword({
         email: credentials.email,
         password: credentials.password
@@ -164,43 +143,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) throw error;
       
-      // Authentication successful, profile data is loaded in the onAuthStateChange handler
-      
-      // Redirect based on role will happen after profile is loaded
       toast.success("Logged in successfully");
-    } catch (supabaseError) {
-      console.error("Supabase login error:", supabaseError);
-      
-      // Fall back to local storage authentication for development
-      try {
-        // Get users from local storage
-        const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-        const users: Record<string, User & { password: string }> = usersJson ? JSON.parse(usersJson) : {};
-        
-        // Find user by email
-        const foundUser = Object.values(users).find(
-          u => u.email === credentials.email && u.password === hashPassword(credentials.password)
-        );
-        
-        if (!foundUser) {
-          throw new Error("Invalid email or password");
-        }
-        
-        // Remove password before storing in state
-        const { password, ...userWithoutPassword } = foundUser;
-        setUser(userWithoutPassword);
-        
-        // Store current user in localStorage
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
-        
-        // Redirect based on role
-        redirectBasedOnRole(userWithoutPassword.role);
-        
-        toast.success("Logged in successfully (local storage)");
-      } catch (localError) {
-        toast.error((localError as Error).message);
-        throw localError;
-      }
+    } catch (error: any) {
+      console.error("Login error:", error);
+      toast.error(error.message || "Failed to login");
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -225,8 +172,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (authError) throw authError;
       
-      // Profile is automatically created via database trigger
-      
       // Update phone number if provided
       if (authData.user && data.phone) {
         const { error: updateError } = await supabase
@@ -237,52 +182,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (updateError) console.error("Error updating phone number:", updateError);
       }
       
-      toast.success("Account created successfully. Please check your email for verification.");
+      toast.success("Account created successfully");
       
-      // Note: We don't auto-login or redirect here since email verification might be required
-    } catch (supabaseError) {
-      console.error("Supabase signup error:", supabaseError);
-      
-      // Fall back to local storage for development
-      try {
-        // Get users from local storage
-        const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-        const users: Record<string, User & { password: string }> = usersJson ? JSON.parse(usersJson) : {};
-        
-        // Check if email already exists
-        if (Object.values(users).some(u => u.email === data.email)) {
-          throw new Error("Email already exists");
-        }
-        
-        // Create new user
-        const newUser = {
-          id: `user_${Date.now()}`,
+      // Auto-login after signup for better user experience
+      if (authData.user) {
+        // Profile will be fetched by the auth listener
+        setUser({
+          id: authData.user.id,
           name: data.name,
           email: data.email,
           phone: data.phone,
-          password: hashPassword(data.password),
-          role: data.role,
-        };
-        
-        // Add to users store
-        users[newUser.id] = newUser;
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
-        
-        // Login the user
-        const { password, ...userWithoutPassword } = newUser;
-        setUser(userWithoutPassword);
-        
-        // Store current user in localStorage
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userWithoutPassword));
+          role: data.role
+        });
         
         // Redirect based on role
         redirectBasedOnRole(data.role);
-        
-        toast.success("Account created successfully (local storage)");
-      } catch (localError) {
-        toast.error((localError as Error).message);
-        throw localError;
       }
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      toast.error(error.message || "Failed to create account");
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -305,16 +224,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Logout function
   const logout = async () => {
-    // Try Supabase logout
     const { error } = await supabase.auth.signOut();
+    
     if (error) {
-      console.error("Error logging out from Supabase:", error);
+      console.error("Error logging out:", error);
+      toast.error("Failed to log out");
+      return;
     }
     
-    // Always clear local state
     setUser(null);
     setSession(null);
-    localStorage.removeItem(CURRENT_USER_KEY);
     
     navigate("/");
     toast.success("Logged out successfully");

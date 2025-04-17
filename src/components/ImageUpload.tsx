@@ -1,6 +1,8 @@
 
-import { useState, useRef } from "react";
-import { X, Upload, Image as ImageIcon } from "lucide-react";
+import { useState } from "react";
+import { X, Plus, Image as ImageIcon } from "lucide-react";
+import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 
 interface ImageUploadProps {
   maxImages?: number;
@@ -14,39 +16,20 @@ const ImageUpload = ({
   initialImages = [],
 }: ImageUploadProps) => {
   const [images, setImages] = useState<string[]>(initialImages);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageUrl, setImageUrl] = useState<string>("");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = e.target.files;
+  const addImage = () => {
+    if (!imageUrl.trim()) return;
     
-    if (!fileList) return;
-    
-    // Convert FileList to array and check if we're not exceeding max images
-    const selectedFiles = Array.from(fileList);
-    const totalImages = images.length + selectedFiles.length;
-    
-    if (totalImages > maxImages) {
-      alert(`You can only upload up to ${maxImages} images.`);
+    if (images.length >= maxImages) {
+      alert(`You can only add up to ${maxImages} images.`);
       return;
     }
     
-    // Read files as data URLs
-    selectedFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          const newImages = [...images, event.target.result.toString()];
-          setImages(newImages);
-          onImagesChange(newImages);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    // Reset input value so the same file can be selected again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    const newImages = [...images, imageUrl.trim()];
+    setImages(newImages);
+    onImagesChange(newImages);
+    setImageUrl("");
   };
 
   const removeImage = (index: number) => {
@@ -56,8 +39,34 @@ const ImageUpload = ({
     onImagesChange(newImages);
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addImage();
+    }
+  };
+
   return (
     <div className="space-y-4">
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <Input
+            value={imageUrl}
+            onChange={(e) => setImageUrl(e.target.value)}
+            placeholder="Enter image URL (e.g., https://example.com/image.jpg)"
+            onKeyPress={handleKeyPress}
+          />
+        </div>
+        <Button 
+          type="button" 
+          onClick={addImage}
+          disabled={!imageUrl.trim() || images.length >= maxImages}
+        >
+          <Plus size={16} className="mr-1" />
+          Add
+        </Button>
+      </div>
+      
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {/* Image previews */}
         {images.map((image, index) => (
@@ -69,6 +78,9 @@ const ImageUpload = ({
               src={image} 
               alt={`Uploaded image ${index + 1}`} 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/placeholder.svg";
+              }}
             />
             <button
               type="button"
@@ -81,32 +93,19 @@ const ImageUpload = ({
           </div>
         ))}
         
-        {/* Upload button */}
-        {images.length < maxImages && (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="aspect-square rounded-md border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center transition-colors"
-          >
-            <Upload size={24} className="text-muted-foreground mb-1" />
+        {/* Upload placeholder */}
+        {images.length === 0 && (
+          <div className="aspect-square rounded-md border-2 border-dashed border-border flex flex-col items-center justify-center">
+            <ImageIcon size={24} className="text-muted-foreground mb-1" />
             <span className="text-xs text-muted-foreground">
-              {images.length === 0 ? "Upload Images" : "Add More"}
+              No images added yet
             </span>
-          </button>
+          </div>
         )}
       </div>
       
-      <input
-        type="file"
-        ref={fileInputRef}
-        className="hidden"
-        accept="image/*"
-        multiple
-        onChange={handleFileChange}
-      />
-      
       <p className="text-xs text-muted-foreground">
-        {images.length} of {maxImages} images uploaded. Click on an image to remove it.
+        {images.length} of {maxImages} images added. Enter image URLs to add them to your listing.
       </p>
     </div>
   );

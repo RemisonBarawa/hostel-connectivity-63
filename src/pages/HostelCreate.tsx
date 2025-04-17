@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -12,8 +11,8 @@ import { toast } from "sonner";
 import { AlertCircle, ArrowLeft, Save } from "lucide-react";
 import ImageUpload from "../components/ImageUpload";
 import Navbar from "../components/Navbar";
-import { Hostel } from "../components/HostelCard";
 import { Separator } from "../components/ui/separator";
+import { supabase } from "../integrations/supabase/client";
 
 // Type for form data
 interface HostelFormData {
@@ -33,9 +32,6 @@ interface HostelFormData {
   };
   images: string[];
 }
-
-// Storage key for hostels
-const HOSTELS_STORAGE_KEY = "hostel_listings";
 
 const HostelCreate = () => {
   const { id } = useParams();
@@ -74,43 +70,75 @@ const HostelCreate = () => {
   
   // Fetch hostel data if editing
   useEffect(() => {
-    if (isEditing && id) {
-      // Get hostels from localStorage
-      const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-      const hostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
-      
-      const hostel = hostels[id];
-      
-      if (hostel) {
-        // Only allow editing if the user is the owner or an admin
-        if (user?.id === hostel.ownerId || user?.role === "admin") {
-          setFormData({
-            name: hostel.name,
-            location: hostel.location,
-            price: String(hostel.price),
-            rooms: String(hostel.rooms),
-            description: hostel.description || "",
-            amenities: {
-              wifi: hostel.amenities?.wifi || false,
-              water: hostel.amenities?.water || false,
-              electricity: hostel.amenities?.electricity || false,
-              security: hostel.amenities?.security || false,
-              furniture: hostel.amenities?.furniture || false,
-              kitchen: hostel.amenities?.kitchen || false,
-              bathroom: hostel.amenities?.bathroom || false,
-            },
-            images: hostel.images || [],
-          });
-        } else {
-          toast.error("You don't have permission to edit this hostel");
+    const fetchHostelData = async () => {
+      if (isEditing && id) {
+        try {
+          // Get hostel from Supabase
+          const { data: hostel, error } = await supabase
+            .from('hostels')
+            .select(`
+              *,
+              amenities (*),
+              hostel_images (*)
+            `)
+            .eq('id', id)
+            .single();
+          
+          if (error) throw error;
+          
+          if (hostel) {
+            // Only allow editing if the user is the owner or an admin
+            if (user?.id === hostel.owner_id || user?.role === "admin") {
+              const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
+                wifi: false,
+                water: false,
+                electricity: false,
+                security: false,
+                furniture: false,
+                kitchen: false,
+                bathroom: false
+              };
+              
+              const images = hostel.hostel_images ? 
+                hostel.hostel_images.map((img: any) => img.image_url) : [];
+              
+              setFormData({
+                name: hostel.name,
+                location: hostel.location,
+                price: String(hostel.price),
+                rooms: String(hostel.rooms),
+                description: hostel.description || "",
+                amenities: {
+                  wifi: amenitiesData.wifi || false,
+                  water: amenitiesData.water || false,
+                  electricity: amenitiesData.electricity || false,
+                  security: amenitiesData.security || false,
+                  furniture: amenitiesData.furniture || false,
+                  kitchen: amenitiesData.kitchen || false,
+                  bathroom: amenitiesData.bathroom || false,
+                },
+                images,
+              });
+            } else {
+              toast.error("You don't have permission to edit this hostel");
+              navigate("/owner-dashboard");
+            }
+          } else {
+            toast.error("Hostel not found");
+            navigate("/owner-dashboard");
+          }
+        } catch (error) {
+          console.error("Error fetching hostel:", error);
+          toast.error("Failed to load hostel data");
           navigate("/owner-dashboard");
         }
-      } else {
-        toast.error("Hostel not found");
-        navigate("/owner-dashboard");
       }
+    };
+    
+    if (isAuthenticated && user) {
+      fetchHostelData();
     }
-  }, [isEditing, id, user, navigate]);
+  }, [isEditing, id, user, navigate, isAuthenticated]);
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -162,7 +190,7 @@ const HostelCreate = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -178,29 +206,91 @@ const HostelCreate = () => {
     setIsSubmitting(true);
     
     try {
-      // Get existing hostels
-      const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-      const hostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
+      let hostelId = id;
       
-      // Create or update hostel object
-      const hostelId = isEditing ? id! : `hostel_${Date.now()}`;
-      const hostel: Hostel = {
-        id: hostelId,
-        name: formData.name,
-        location: formData.location,
-        price: parseFloat(formData.price),
-        rooms: parseInt(formData.rooms, 10),
-        description: formData.description,
-        amenities: formData.amenities,
-        images: formData.images,
-        ownerId: user.id,
-        createdAt: isEditing ? hostels[hostelId].createdAt : new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // Create or update hostel
+      if (isEditing && id) {
+        // Update existing hostel
+        const { error: hostelError } = await supabase
+          .from('hostels')
+          .update({
+            name: formData.name,
+            location: formData.location,
+            price: parseFloat(formData.price),
+            rooms: parseInt(formData.rooms, 10),
+            description: formData.description,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+          
+        if (hostelError) throw hostelError;
+        
+        // Update amenities
+        const { error: amenitiesError } = await supabase
+          .from('amenities')
+          .update(formData.amenities)
+          .eq('hostel_id', id);
+          
+        if (amenitiesError) throw amenitiesError;
+        
+        // Delete existing images and add new ones
+        const { error: deleteImagesError } = await supabase
+          .from('hostel_images')
+          .delete()
+          .eq('hostel_id', id);
+          
+        if (deleteImagesError) throw deleteImagesError;
+      } else {
+        // Create new hostel
+        const { data: newHostel, error: hostelError } = await supabase
+          .from('hostels')
+          .insert({
+            owner_id: user.id,
+            name: formData.name,
+            location: formData.location,
+            price: parseFloat(formData.price),
+            rooms: parseInt(formData.rooms, 10),
+            description: formData.description,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+          
+        if (hostelError) throw hostelError;
+        
+        if (!newHostel) {
+          throw new Error("Failed to create hostel");
+        }
+        
+        hostelId = newHostel.id;
+        
+        // Insert amenities
+        const { error: amenitiesError } = await supabase
+          .from('amenities')
+          .insert({
+            hostel_id: hostelId,
+            ...formData.amenities
+          });
+          
+        if (amenitiesError) throw amenitiesError;
+      }
       
-      // Save to "database"
-      hostels[hostelId] = hostel;
-      localStorage.setItem(HOSTELS_STORAGE_KEY, JSON.stringify(hostels));
+      // Add images
+      if (formData.images.length > 0) {
+        const imageInserts = formData.images.map(imageUrl => ({
+          hostel_id: hostelId!,
+          image_url: imageUrl,
+          created_at: new Date().toISOString(),
+          is_primary: false
+        }));
+        
+        const { error: imagesError } = await supabase
+          .from('hostel_images')
+          .insert(imageInserts);
+          
+        if (imagesError) throw imagesError;
+      }
       
       toast.success(isEditing ? "Hostel updated successfully" : "Hostel created successfully");
       navigate("/owner-dashboard");
