@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -80,13 +79,13 @@ const AdminDashboard = () => {
         
       if (profilesError) throw profilesError;
       
-      // We need to get emails from auth.users, but that's not accessible via the client
-      // So we'll return just the profiles data for now
+      // Cast the role property to the correct type
       const userProfiles: UserProfile[] = profiles.map(profile => ({
         ...profile,
-        // For email, we would typically get this from auth.users
-        // but we don't have access to that table from the client
-        // Instead, we'll show that email data is not available at this level
+        // Ensure role is one of the allowed values, default to "student" if not
+        role: (profile.role === "student" || profile.role === "owner" || profile.role === "admin") 
+          ? profile.role as "student" | "owner" | "admin"
+          : "student"
       }));
       
       return userProfiles;
