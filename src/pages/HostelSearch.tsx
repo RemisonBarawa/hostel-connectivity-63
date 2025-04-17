@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "../contexts/AuthContext";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
@@ -27,7 +26,7 @@ const HostelSearch = () => {
   const [searchForm, setSearchForm] = useState({
     location: initialLocation,
     minPrice: 0,
-    maxPrice: 1000,
+    maxPrice: 10000,
     amenities: {
       wifi: false,
       water: false,
@@ -62,15 +61,18 @@ const HostelSearch = () => {
         
         // Transform Supabase data to match Hostel type
         return data.map(hostel => {
-          const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
-            wifi: false,
-            water: false,
-            electricity: false,
-            security: false,
-            furniture: false,
-            kitchen: false,
-            bathroom: false
-          };
+          // Get the most recent amenities record (there may be multiple due to potential data issues)
+          const amenitiesData = hostel.amenities && hostel.amenities.length > 0
+            ? hostel.amenities[hostel.amenities.length - 1]
+            : {
+                wifi: false,
+                water: false,
+                electricity: false,
+                security: false,
+                furniture: false,
+                kitchen: false,
+                bathroom: false
+              };
           
           const images = hostel.hostel_images || [];
           
@@ -176,7 +178,7 @@ const HostelSearch = () => {
     setSearchForm({
       location: "",
       minPrice: 0,
-      maxPrice: 1000,
+      maxPrice: 10000,
       amenities: {
         wifi: false,
         water: false,
@@ -194,7 +196,7 @@ const HostelSearch = () => {
     return (
       searchForm.location !== "" ||
       searchForm.minPrice !== 0 ||
-      searchForm.maxPrice !== 1000 ||
+      searchForm.maxPrice !== 10000 ||
       Object.values(searchForm.amenities).some((value) => value)
     );
   };
@@ -259,8 +261,8 @@ const HostelSearch = () => {
                       <Slider
                         defaultValue={[searchForm.minPrice, searchForm.maxPrice]}
                         min={0}
-                        max={1000}
-                        step={10}
+                        max={10000}
+                        step={100}
                         value={[searchForm.minPrice, searchForm.maxPrice]}
                         onValueChange={handlePriceChange}
                       />
@@ -348,22 +350,7 @@ const HostelSearch = () => {
               <p className="text-muted-foreground max-w-md mx-auto mb-6">
                 No hostels match your current filters. Try adjusting your search criteria or clearing filters.
               </p>
-              <Button onClick={() => {
-                setSearchForm({
-                  location: "",
-                  minPrice: 0,
-                  maxPrice: 1000,
-                  amenities: {
-                    wifi: false,
-                    water: false,
-                    electricity: false,
-                    security: false,
-                    furniture: false,
-                    kitchen: false,
-                    bathroom: false,
-                  },
-                });
-              }}>Clear All Filters</Button>
+              <Button onClick={clearFilters}>Clear All Filters</Button>
             </div>
           ) : (
             // Results grid

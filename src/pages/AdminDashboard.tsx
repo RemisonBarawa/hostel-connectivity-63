@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -17,11 +18,7 @@ import { toast } from "sonner";
 import { Home, Users, User, Trash, Edit, UserCheck, LogIn } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { Hostel } from "../components/HostelCard";
-
-// Storage keys
-const HOSTELS_STORAGE_KEY = "hostel_listings";
-const BOOKINGS_STORAGE_KEY = "hostel_bookings";
-const USERS_STORAGE_KEY = "hostel_users";
+import { supabase } from "../integrations/supabase/client";
 
 interface AppUser {
   id: string;
@@ -35,10 +32,6 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [hostels, setHostels] = useState<Hostel[]>([]);
-  const [bookingsCount, setBookingsCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: "user" | "hostel"; id: string } | null>(null);
   
@@ -57,40 +50,112 @@ const AdminDashboard = () => {
     }
   }, [isAuthenticated, user, navigate]);
   
-  // Fetch all data for admin dashboard
-  useEffect(() => {
-    if (!isAuthenticated || !user || user.role !== "admin") return;
-    
-    setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+  // Fetch all users from the profiles table
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: async () => {
       try {
-        // Get all users
-        const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-        const allUsers: Record<string, AppUser> = usersJson ? JSON.parse(usersJson) : {};
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('*');
+          
+        if (error) throw error;
         
-        // Filter out passwords from users for security
-        const usersArray = Object.values(allUsers).map(({ password, ...userWithoutPassword }: any) => userWithoutPassword);
-        setUsers(usersArray);
-        
-        // Get all hostels
-        const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-        const allHostels: Record<string, Hostel> = hostelsJson ? JSON.parse(hostelsJson) : {};
-        setHostels(Object.values(allHostels));
-        
-        // Get booking count
-        const bookingsJson = localStorage.getItem(BOOKINGS_STORAGE_KEY);
-        const allBookings = bookingsJson ? JSON.parse(bookingsJson) : {};
-        setBookingsCount(Object.keys(allBookings).length);
+        // Transform the profiles data to match our AppUser interface
+        return profiles.map(profile => ({
+          id: profile.id,
+          name: profile.full_name,
+          email: profile.email || '',
+          phone: profile.phone_number || '',
+          role: profile.role as "student" | "owner" | "admin",
+        }));
       } catch (error) {
-        console.error("Error loading admin data:", error);
-        toast.error("Failed to load admin dashboard data");
-      } finally {
-        setIsLoading(false);
+        console.error('Error fetching users:', error);
+        toast.error('Failed to fetch users');
+        return [];
       }
-    }, 800);
-  }, [isAuthenticated, user, navigate]);
+    },
+    enabled: !!user && isAuthenticated && user.role === 'admin'
+  });
+  
+  // Fetch all hostels from the hostels table
+  const { data: hostels = [], isLoading: hostelsLoading } = useQuery({
+    queryKey: ['adminHostels'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('hostels')
+          .select(`
+            *,
+            amenities (*),
+            hostel_images (*)
+          `);
+          
+        if (error) throw error;
+        
+        // Transform the data to match our Hostel interface
+        return data.map(hostel => {
+          const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
+            wifi: false,
+            water: false,
+            electricity: false,
+            security: false,
+            furniture: false,
+            kitchen: false,
+            bathroom: false
+          };
+          
+          const images = hostel.hostel_images || [];
+          
+          return {
+            id: hostel.id,
+            name: hostel.name,
+            location: hostel.location,
+            description: hostel.description || '',
+            price: hostel.price,
+            rooms: hostel.rooms,
+            ownerId: hostel.owner_id,
+            amenities: {
+              wifi: amenitiesData.wifi || false,
+              water: amenitiesData.water || false,
+              electricity: amenitiesData.electricity || false,
+              security: amenitiesData.security || false,
+              furniture: amenitiesData.furniture || false,
+              kitchen: amenitiesData.kitchen || false,
+              bathroom: amenitiesData.bathroom || false,
+            },
+            images: images.map(img => img.image_url),
+            createdAt: hostel.created_at
+          };
+        });
+      } catch (error) {
+        console.error('Error fetching hostels:', error);
+        toast.error('Failed to fetch hostels');
+        return [];
+      }
+    },
+    enabled: !!user && isAuthenticated && user.role === 'admin'
+  });
+  
+  // Fetch all bookings to get the count
+  const { data: bookingsCount = 0, isLoading: bookingsLoading } = useQuery({
+    queryKey: ['adminBookingsCount'],
+    queryFn: async () => {
+      try {
+        const { count, error } = await supabase
+          .from('bookings')
+          .select('*', { count: 'exact', head: true });
+          
+        if (error) throw error;
+        
+        return count || 0;
+      } catch (error) {
+        console.error('Error fetching bookings count:', error);
+        return 0;
+      }
+    },
+    enabled: !!user && isAuthenticated && user.role === 'admin'
+  });
   
   // Open delete confirmation dialog
   const openDeleteDialog = (type: "user" | "hostel", id: string) => {
@@ -99,15 +164,11 @@ const AdminDashboard = () => {
   };
   
   // Delete user or hostel
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!itemToDelete) return;
     
     try {
       if (itemToDelete.type === "user") {
-        // Get all users
-        const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-        const allUsers = usersJson ? JSON.parse(usersJson) : {};
-        
         // Check if trying to delete self
         if (itemToDelete.id === user?.id) {
           toast.error("You cannot delete your own account");
@@ -116,35 +177,29 @@ const AdminDashboard = () => {
           return;
         }
         
-        // Remove this user
-        delete allUsers[itemToDelete.id];
-        
-        // Save back to localStorage
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(allUsers));
-        
-        // Update state
-        setUsers(users.filter((u) => u.id !== itemToDelete.id));
+        // Delete from Supabase - this will cascade to the auth.users table via RLS policies
+        const { error } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', itemToDelete.id);
+          
+        if (error) throw error;
         
         toast.success("User deleted successfully");
       } else if (itemToDelete.type === "hostel") {
-        // Get all hostels
-        const hostelsJson = localStorage.getItem(HOSTELS_STORAGE_KEY);
-        const allHostels = hostelsJson ? JSON.parse(hostelsJson) : {};
-        
-        // Remove this hostel
-        delete allHostels[itemToDelete.id];
-        
-        // Save back to localStorage
-        localStorage.setItem(HOSTELS_STORAGE_KEY, JSON.stringify(allHostels));
-        
-        // Update state
-        setHostels(hostels.filter((h) => h.id !== itemToDelete.id));
+        // Delete from Supabase
+        const { error } = await supabase
+          .from('hostels')
+          .delete()
+          .eq('id', itemToDelete.id);
+          
+        if (error) throw error;
         
         toast.success("Hostel deleted successfully");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting item:", error);
-      toast.error(`Failed to delete ${itemToDelete.type}`);
+      toast.error(`Failed to delete ${itemToDelete.type}: ${error.message}`);
     } finally {
       setDeleteDialogOpen(false);
       setItemToDelete(null);
@@ -152,37 +207,42 @@ const AdminDashboard = () => {
   };
   
   // Login as user (for admin testing)
-  const loginAsUser = (userId: string) => {
+  const loginAsUser = async (userId: string) => {
     try {
-      // Get all users
-      const usersJson = localStorage.getItem(USERS_STORAGE_KEY);
-      const allUsers = usersJson ? JSON.parse(usersJson) : {};
-      
-      const targetUser = allUsers[userId];
-      
-      if (!targetUser) {
+      const { data: targetUser, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+        
+      if (error) {
         toast.error("User not found");
         return;
       }
       
-      // Remove password from user object
-      const { password, ...userWithoutPassword } = targetUser;
-      
-      // Store in localStorage as current user
-      localStorage.setItem("hostel_current_user", JSON.stringify(userWithoutPassword));
-      
-      // Refresh page to update auth context
-      window.location.reload();
-    } catch (error) {
+      // Since we can't directly impersonate users in Supabase, 
+      // we'll just redirect to their dashboard based on role
+      if (targetUser.role === 'student') {
+        navigate('/student-dashboard');
+        toast.success(`Viewing as student: ${targetUser.full_name}`);
+      } else if (targetUser.role === 'owner') {
+        navigate('/owner-dashboard');
+        toast.success(`Viewing as owner: ${targetUser.full_name}`);
+      } else {
+        toast.error("Cannot impersonate this user type");
+      }
+    } catch (error: any) {
       console.error("Error logging in as user:", error);
-      toast.error("Failed to login as user");
+      toast.error(`Failed to login as user: ${error.message}`);
     }
   };
   
+  const isLoading = usersLoading || hostelsLoading || bookingsLoading;
+  
   // Calculate stats
-  const studentCount = users.filter((user) => user.role === "student").length;
-  const ownerCount = users.filter((user) => user.role === "owner").length;
-  const adminCount = users.filter((user) => user.role === "admin").length;
+  const studentCount = users.filter((appUser) => appUser.role === "student").length;
+  const ownerCount = users.filter((appUser) => appUser.role === "owner").length;
+  const adminCount = users.filter((appUser) => appUser.role === "admin").length;
   
   return (
     <div className="min-h-screen bg-secondary/10">

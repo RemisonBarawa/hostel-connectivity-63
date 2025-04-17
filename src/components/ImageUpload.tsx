@@ -46,6 +46,15 @@ const ImageUpload = ({
     }
   };
 
+  const isValidUrl = (url: string) => {
+    try {
+      return Boolean(url.trim()) && 
+        (url.startsWith('http://') || url.startsWith('https://'));
+    } catch (_) {
+      return false;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-end gap-2">
@@ -55,12 +64,18 @@ const ImageUpload = ({
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="Enter image URL (e.g., https://example.com/image.jpg)"
             onKeyPress={handleKeyPress}
+            className={!isValidUrl(imageUrl) && imageUrl.trim() !== "" ? "border-red-300" : ""}
           />
+          {!isValidUrl(imageUrl) && imageUrl.trim() !== "" && (
+            <p className="text-xs text-red-500 mt-1">
+              Please enter a valid URL (starting with http:// or https://)
+            </p>
+          )}
         </div>
         <Button 
           type="button" 
           onClick={addImage}
-          disabled={!imageUrl.trim() || images.length >= maxImages}
+          disabled={!isValidUrl(imageUrl) || images.length >= maxImages}
         >
           <Plus size={16} className="mr-1" />
           Add
