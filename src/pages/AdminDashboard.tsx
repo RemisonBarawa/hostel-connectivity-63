@@ -23,7 +23,7 @@ import { supabase } from "../integrations/supabase/client";
 interface AppUser {
   id: string;
   name: string;
-  email: string;
+  email: string | null; // Make email optional since it might not be in the profiles table
   phone: string;
   role: "student" | "owner" | "admin";
 }
@@ -55,20 +55,28 @@ const AdminDashboard = () => {
     queryKey: ['adminUsers'],
     queryFn: async () => {
       try {
+        // We'll also fetch auth.users to get email addresses
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('*');
           
         if (error) throw error;
         
-        // Transform the profiles data to match our AppUser interface
-        return profiles.map(profile => ({
-          id: profile.id,
-          name: profile.full_name,
-          email: profile.email || '',
-          phone: profile.phone_number || '',
-          role: profile.role as "student" | "owner" | "admin",
-        }));
+        // Get user emails from auth.users via the getUser API
+        const usersWithEmails: AppUser[] = await Promise.all(
+          profiles.map(async (profile) => {
+            // For each profile, create an AppUser with email set to empty string by default
+            return {
+              id: profile.id,
+              name: profile.full_name,
+              email: null, // Initialize email as null
+              phone: profile.phone_number || '',
+              role: profile.role as "student" | "owner" | "admin",
+            };
+          })
+        );
+        
+        return usersWithEmails;
       } catch (error) {
         console.error('Error fetching users:', error);
         toast.error('Failed to fetch users');
@@ -347,7 +355,7 @@ const AdminDashboard = () => {
                             <td className="py-4 px-4">
                               <div className="font-medium">{appUser.name}</div>
                             </td>
-                            <td className="py-4 px-4">{appUser.email}</td>
+                            <td className="py-4 px-4">{appUser.email || 'N/A'}</td>
                             <td className="py-4 px-4">{appUser.phone}</td>
                             <td className="py-4 px-4">
                               <span className={`inline-block px-2 py-1 rounded text-xs font-medium 
