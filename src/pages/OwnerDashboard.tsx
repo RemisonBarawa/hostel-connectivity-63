@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +12,7 @@ import { Home, Clock, Check, X, Plus, ExternalLink } from "lucide-react";
 import Navbar from "../components/Navbar";
 import HostelCard, { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
+import ProfileEdit from "../components/ProfileEdit";
 
 // Type for booking requests with appropriate typing for status
 interface BookingRequest {
@@ -35,6 +37,7 @@ const OwnerDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("dashboard");
   
   // Redirect if not authenticated or not an owner
   useEffect(() => {
@@ -292,68 +295,107 @@ const OwnerDashboard = () => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-xl font-semibold">Booking Requests</h2>
-                <p className="text-muted-foreground">Manage and track your hostel booking requests</p>
-              </div>
+          <div className="lg:col-span-2">
+            <Card className="mb-8">
+              <CardHeader className="pb-4 border-b">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList>
+                    <TabsTrigger value="dashboard">
+                      Dashboard
+                    </TabsTrigger>
+                    <TabsTrigger value="profile">
+                      My Profile
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </CardHeader>
               
-              {isLoading ? (
-                <div className="p-6">
-                  <div className="animate-pulse space-y-4">
-                    <div className="h-12 bg-secondary rounded-md"></div>
-                    <div className="h-48 bg-secondary rounded-md"></div>
-                    <div className="h-48 bg-secondary rounded-md"></div>
+              <CardContent className="p-6">
+                <TabsContent value="dashboard">
+                  <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
+                    <div className="p-6 border-b border-border">
+                      <h2 className="text-xl font-semibold">Booking Requests</h2>
+                      <p className="text-muted-foreground">Manage and track your hostel booking requests</p>
+                    </div>
+                    
+                    {isLoading ? (
+                      <div className="p-6">
+                        <div className="animate-pulse space-y-4">
+                          <div className="h-12 bg-secondary rounded-md"></div>
+                          <div className="h-48 bg-secondary rounded-md"></div>
+                          <div className="h-48 bg-secondary rounded-md"></div>
+                        </div>
+                      </div>
+                    ) : bookings.length === 0 ? (
+                      <div className="text-center py-12">
+                        <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
+                          <Clock size={24} className="text-muted-foreground" />
+                        </div>
+                        <h3 className="text-lg font-medium mb-1">No Booking Requests Yet</h3>
+                        <p className="text-muted-foreground max-w-md mx-auto mb-6">
+                          You haven't received any booking requests for your hostels yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-6">
+                        <Tabs defaultValue="all">
+                          <TabsList className="mb-6">
+                            <TabsTrigger value="all">
+                              All ({bookings.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="pending">
+                              Pending ({pendingBookings.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="approved">
+                              Approved ({approvedBookings.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="rejected">
+                              Rejected ({rejectedBookings.length})
+                            </TabsTrigger>
+                          </TabsList>
+                          
+                          <TabsContent value="all">
+                            <BookingsList 
+                              filteredBookings={bookings}
+                              approveBooking={approveBooking}
+                              rejectBooking={rejectBooking}
+                            />
+                          </TabsContent>
+                          
+                          <TabsContent value="pending">
+                            <BookingsList 
+                              filteredBookings={pendingBookings} 
+                              approveBooking={approveBooking}
+                              rejectBooking={rejectBooking}
+                            />
+                          </TabsContent>
+                          
+                          <TabsContent value="approved">
+                            <BookingsList 
+                              filteredBookings={approvedBookings}
+                              approveBooking={approveBooking}
+                              rejectBooking={rejectBooking}
+                            />
+                          </TabsContent>
+                          
+                          <TabsContent value="rejected">
+                            <BookingsList 
+                              filteredBookings={rejectedBookings}
+                              approveBooking={approveBooking}
+                              rejectBooking={rejectBooking}
+                            />
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : bookings.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="bg-secondary/30 inline-flex items-center justify-center w-16 h-16 rounded-full mb-4">
-                    <Clock size={24} className="text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-1">No Booking Requests Yet</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto mb-6">
-                    You haven't received any booking requests for your hostels yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="p-6">
-                  <Tabs defaultValue="all">
-                    <TabsList className="mb-6">
-                      <TabsTrigger value="all">
-                        All ({bookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="pending">
-                        Pending ({pendingBookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="approved">
-                        Approved ({approvedBookings.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="rejected">
-                        Rejected ({rejectedBookings.length})
-                      </TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="all">
-                      <BookingsList filteredBookings={bookings} />
-                    </TabsContent>
-                    
-                    <TabsContent value="pending">
-                      <BookingsList filteredBookings={pendingBookings} />
-                    </TabsContent>
-                    
-                    <TabsContent value="approved">
-                      <BookingsList filteredBookings={approvedBookings} />
-                    </TabsContent>
-                    
-                    <TabsContent value="rejected">
-                      <BookingsList filteredBookings={rejectedBookings} />
-                    </TabsContent>
-                  </Tabs>
-                </div>
-              )}
-            </div>
+                </TabsContent>
+                
+                <TabsContent value="profile">
+                  <ProfileEdit />
+                </TabsContent>
+              </CardContent>
+            </Card>
           </div>
           
           <div className="space-y-8">
@@ -411,7 +453,15 @@ const OwnerDashboard = () => {
 };
 
 // Booking list component
-const BookingsList = ({ filteredBookings }: { filteredBookings: BookingRequest[] }) => {
+const BookingsList = ({ 
+  filteredBookings, 
+  approveBooking,
+  rejectBooking
+}: { 
+  filteredBookings: BookingRequest[],
+  approveBooking: (id: string) => void,
+  rejectBooking: (id: string) => void
+}) => {
   const navigate = useNavigate();
   
   if (filteredBookings.length === 0) {
@@ -514,57 +564,6 @@ const BookingsList = ({ filteredBookings }: { filteredBookings: BookingRequest[]
       ))}
     </div>
   );
-};
-
-// Helper functions
-const approveBooking = (bookingId: string) => {
-  // This will be called from the BookingsList component
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
-  const updateBooking = async () => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'approved' })
-        .eq('id', bookingId);
-        
-      if (error) throw error;
-      
-      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
-      toast.success("Booking approved successfully");
-    } catch (error) {
-      console.error("Error approving booking:", error);
-      toast.error("Failed to approve booking");
-    }
-  };
-  
-  updateBooking();
-};
-
-const rejectBooking = (bookingId: string) => {
-  // This will be called from the BookingsList component
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  
-  const updateBooking = async () => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ status: 'rejected' })
-        .eq('id', bookingId);
-        
-      if (error) throw error;
-      
-      queryClient.invalidateQueries({ queryKey: ['ownerBookings', user?.id] });
-      toast.success("Booking rejected");
-    } catch (error) {
-      console.error("Error rejecting booking:", error);
-      toast.error("Failed to reject booking");
-    }
-  };
-  
-  updateBooking();
 };
 
 export default OwnerDashboard;
