@@ -144,12 +144,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
       
       toast.success("Logged in successfully");
+      
+      // Redirect will happen automatically due to auth state change
     } catch (error: any) {
       console.error("Login error:", error);
       toast.error(error.message || "Failed to login");
+      setIsLoading(false); // Make sure to reset loading state on error
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -201,9 +202,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error: any) {
       console.error("Signup error:", error);
       toast.error(error.message || "Failed to create account");
+      setIsLoading(false); // Make sure to reset loading state on error
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -224,11 +224,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Logout function
   const logout = async () => {
+    setIsLoading(true);
     const { error } = await supabase.auth.signOut();
     
     if (error) {
       console.error("Error logging out:", error);
       toast.error("Failed to log out");
+      setIsLoading(false);
       return;
     }
     
@@ -237,6 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     navigate("/");
     toast.success("Logged out successfully");
+    setIsLoading(false);
   };
 
   return (

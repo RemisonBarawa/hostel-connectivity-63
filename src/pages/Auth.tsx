@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth, UserRole } from "../contexts/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -26,6 +27,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  const [localLoading, setLocalLoading] = useState(false); // Add local loading state
   
   // Form state
   const [formData, setFormData] = useState({
@@ -100,9 +102,11 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setServerError(null);
+    setLocalLoading(true); // Start local loading
     
     if (!validateForm()) {
       toast.error("Please fix the errors in the form");
+      setLocalLoading(false); // Reset loading state on validation error
       return;
     }
     
@@ -121,11 +125,16 @@ const Auth = () => {
           role: formData.role,
         });
       }
+      // No need to set loading to false on success as we'll redirect
     } catch (error: any) {
       console.error("Authentication error:", error);
       setServerError(error.message || "Authentication failed");
+      setLocalLoading(false); // Reset loading state on error
     }
   };
+  
+  // Determine if button should show loading state
+  const buttonLoading = localLoading || isLoading;
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -223,6 +232,7 @@ const Auth = () => {
                   value={formData.email}
                   onChange={handleChange}
                   className={errors.email ? "border-red-500" : ""}
+                  disabled={buttonLoading}
                 />
                 {errors.email && (
                   <p className="text-xs text-red-500">{errors.email}</p>
@@ -240,11 +250,13 @@ const Auth = () => {
                     value={formData.password}
                     onChange={handleChange}
                     className={`pr-10 ${errors.password ? "border-red-500" : ""}`}
+                    disabled={buttonLoading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    disabled={buttonLoading}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -257,9 +269,9 @@ const Auth = () => {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={buttonLoading}
               >
-                {isLoading
+                {buttonLoading
                   ? "Processing..."
                   : mode === "login"
                   ? "Sign In"
@@ -275,6 +287,7 @@ const Auth = () => {
                     type="button"
                     onClick={() => setMode("signup")}
                     className="text-primary hover:underline font-medium"
+                    disabled={buttonLoading}
                   >
                     Sign up
                   </button>
@@ -286,6 +299,7 @@ const Auth = () => {
                     type="button"
                     onClick={() => setMode("login")}
                     className="text-primary hover:underline font-medium"
+                    disabled={buttonLoading}
                   >
                     Sign in
                   </button>
