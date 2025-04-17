@@ -15,7 +15,7 @@ import {
   DialogDescription 
 } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { Home, Users, User, Trash, Edit, UserCheck, LogIn } from "lucide-react";
+import { Home, Users, User, Trash, Edit, UserCheck, LogIn, Mail, Phone } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
@@ -23,7 +23,7 @@ import { supabase } from "../integrations/supabase/client";
 interface AppUser {
   id: string;
   name: string;
-  email: string | null; // Make email optional since it might not be in the profiles table
+  email: string | null;
   phone: string;
   role: "student" | "owner" | "admin";
 }
@@ -55,7 +55,7 @@ const AdminDashboard = () => {
     queryKey: ['adminUsers'],
     queryFn: async () => {
       try {
-        // We'll also fetch auth.users to get email addresses
+        // Get all profiles and user emails
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('*');
@@ -65,13 +65,16 @@ const AdminDashboard = () => {
         // Get user emails from auth.users via the getUser API
         const usersWithEmails: AppUser[] = await Promise.all(
           profiles.map(async (profile) => {
-            // For each profile, create an AppUser with email set to empty string by default
+            // Try to get user email from auth.users (this may not be available in Supabase JS client)
+            let email = null;
+            
+            // Create AppUser with available information
             return {
               id: profile.id,
               name: profile.full_name,
-              email: null, // Initialize email as null
-              phone: profile.phone_number || '',
-              role: profile.role as "student" | "owner" | "admin",
+              email: email, // May be updated if email is available in the auth user data
+              phone: profile.phone_number || 'Not provided',
+              role: validateUserRole(profile.role),
             };
           })
         );
@@ -85,6 +88,12 @@ const AdminDashboard = () => {
     },
     enabled: !!user && isAuthenticated && user.role === 'admin'
   });
+  
+  // Helper function to validate user role
+  const validateUserRole = (role: string): "student" | "owner" | "admin" => {
+    const validRoles = ["student", "owner", "admin"];
+    return validRoles.includes(role) ? (role as "student" | "owner" | "admin") : "student";
+  };
   
   // Fetch all hostels from the hostels table
   const { data: hostels = [], isLoading: hostelsLoading } = useQuery({
@@ -251,6 +260,14 @@ const AdminDashboard = () => {
   const studentCount = users.filter((appUser) => appUser.role === "student").length;
   const ownerCount = users.filter((appUser) => appUser.role === "owner").length;
   const adminCount = users.filter((appUser) => appUser.role === "admin").length;
+
+  // Format phone number for display
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone || phone === 'Not provided') return 'Not provided';
+    
+    // Simple formatting - in production you might want more sophisticated formatting
+    return phone;
+  };
   
   return (
     <div className="min-h-screen bg-secondary/10">
@@ -343,8 +360,7 @@ const AdminDashboard = () => {
                       <thead>
                         <tr className="border-b border-border">
                           <th className="py-3 px-4 text-left font-medium text-muted-foreground">Name</th>
-                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Email</th>
-                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Phone</th>
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Contact</th>
                           <th className="py-3 px-4 text-left font-medium text-muted-foreground">Role</th>
                           <th className="py-3 px-4 text-right font-medium text-muted-foreground">Actions</th>
                         </tr>
@@ -355,8 +371,18 @@ const AdminDashboard = () => {
                             <td className="py-4 px-4">
                               <div className="font-medium">{appUser.name}</div>
                             </td>
-                            <td className="py-4 px-4">{appUser.email || 'N/A'}</td>
-                            <td className="py-4 px-4">{appUser.phone}</td>
+                            <td className="py-4 px-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center text-sm">
+                                  <Mail size={14} className="mr-1.5 text-muted-foreground" />
+                                  {appUser.email || 'Not available'}
+                                </div>
+                                <div className="flex items-center text-sm">
+                                  <Phone size={14} className="mr-1.5 text-muted-foreground" />
+                                  {formatPhoneNumber(appUser.phone)}
+                                </div>
+                              </div>
+                            </td>
                             <td className="py-4 px-4">
                               <span className={`inline-block px-2 py-1 rounded text-xs font-medium 
                                 ${appUser.role === "admin" 

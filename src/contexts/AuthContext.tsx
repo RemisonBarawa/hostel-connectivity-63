@@ -69,12 +69,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (error) throw error;
 
             if (profile) {
+              // Ensure we always have the email from the auth user
               const userData: User = {
                 id: currentSession.user.id,
                 name: profile.full_name,
                 email: currentSession.user.email || '',
                 phone: profile.phone_number || '',
-                role: profile.role as UserRole,
+                role: validateUserRole(profile.role),
               };
               setUser(userData);
               setSession(currentSession);
@@ -109,12 +110,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             if (profile) {
+              // Ensure we always have the email from the auth user
               const userData: User = {
                 id: currentSession.user.id,
                 name: profile.full_name,
                 email: currentSession.user.email || '',
                 phone: profile.phone_number || '',
-                role: profile.role as UserRole,
+                role: validateUserRole(profile.role),
               };
               setUser(userData);
               setSession(currentSession);
@@ -130,6 +132,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Helper function to validate user role
+  const validateUserRole = (role: string): UserRole => {
+    const validRoles: UserRole[] = ["student", "owner", "admin"];
+    return validRoles.includes(role as UserRole) 
+      ? role as UserRole 
+      : "student"; // Default to student if invalid role
+  };
 
   // Login function
   const login = async (credentials: LoginCredentials): Promise<void> => {
