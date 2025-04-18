@@ -197,23 +197,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (authError) throw authError;
       
-      // Update phone number if provided
-      if (authData.user && data.phone) {
+      if (authData.user) {
+        // Explicitly update the profile with phone number directly after signup
         const { error: updateError } = await supabase
           .from('profiles')
-          .update({ phone_number: data.phone })
+          .update({ 
+            phone_number: data.phone 
+          })
           .eq('id', authData.user.id);
           
         if (updateError) {
           console.error("Error updating phone number:", updateError);
+          toast.error("Account created but phone number could not be saved");
+        } else {
+          toast.success("Account created successfully");
         }
-      }
-      
-      toast.success("Account created successfully");
-      
-      // Auto-login after signup for better user experience
-      if (authData.user) {
-        // Profile will be fetched by the auth listener
+        
+        // Set user state
         setUser({
           id: authData.user.id,
           name: data.name,
@@ -229,7 +229,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Signup error:", error);
       toast.error(error.message || "Failed to create account");
       setIsLoading(false); // Make sure to reset loading state on error
-      throw error;
     }
   };
 
