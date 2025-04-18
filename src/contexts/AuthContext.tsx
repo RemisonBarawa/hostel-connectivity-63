@@ -56,40 +56,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         if (currentSession && currentSession.user) {
           // If we have a session, get user profile data from the database
-          try {
-            const { data: profile, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', currentSession.user.id)
-              .single();
-
-            if (error) throw error;
-
-            if (profile) {
-              // Ensure we always have the email from the auth user
-              const userData: User = {
-                id: currentSession.user.id,
-                name: profile.full_name,
-                email: currentSession.user.email || '',
-                phone: profile.phone_number || '',
-                role: validateUserRole(profile.role),
-              };
-              setUser(userData);
-              setSession(currentSession);
+          // Use setTimeout to defer Supabase calls and prevent deadlocks
+          setSession(currentSession);
+          
+          setTimeout(async () => {
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', currentSession.user.id)
+                .single();
+  
+              if (error) throw error;
+  
+              if (profile) {
+                // Ensure we always have the email from the auth user
+                const userData: User = {
+                  id: currentSession.user.id,
+                  name: profile.full_name,
+                  email: currentSession.user.email || '',
+                  phone: profile.phone_number || '',
+                  role: validateUserRole(profile.role),
+                };
+                setUser(userData);
+              }
+            } catch (error) {
+              console.error("Error fetching user profile:", error);
+            } finally {
+              setIsLoading(false);
             }
-          } catch (error) {
-            console.error("Error fetching user profile:", error);
-          }
+          }, 0);
         } else {
           // Clear user data when logged out
           setUser(null);
           setSession(null);
+          setIsLoading(false);
         }
-        
-        setIsLoading(false);
       }
     );
 
@@ -97,6 +102,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (currentSession && currentSession.user) {
         // Fetch profile data for the user
+        setSession(currentSession);
+        
         supabase
           .from('profiles')
           .select('*')
@@ -119,13 +126,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 role: validateUserRole(profile.role),
               };
               setUser(userData);
-              setSession(currentSession);
             }
+            setIsLoading(false);
+          })
+          .catch(err => {
+            console.error("Error in profile fetch:", err);
             setIsLoading(false);
           });
       } else {
         setIsLoading(false);
       }
+    })
+    .catch(error => {
+      console.error("Error getting session:", error);
+      setIsLoading(false);
     });
 
     return () => {
@@ -190,7 +204,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .update({ phone_number: data.phone })
           .eq('id', authData.user.id);
           
-        if (updateError) console.error("Error updating phone number:", updateError);
+        if (updateError) {
+          console.error("Error updating phone number:", updateError);
+        }
       }
       
       toast.success("Account created successfully");
@@ -235,21 +251,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Logout function
   const logout = async () => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      setUser(null);
+      setSession(null);
+      
+      navigate("/");
+      toast.success("Logged out successfully");
+    } catch (error: any) {
       console.error("Error logging out:", error);
       toast.error("Failed to log out");
+    } finally {
       setIsLoading(false);
-      return;
     }
-    
-    setUser(null);
-    setSession(null);
-    
-    navigate("/");
-    toast.success("Logged out successfully");
-    setIsLoading(false);
   };
 
   return (

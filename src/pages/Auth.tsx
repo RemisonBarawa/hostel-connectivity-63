@@ -16,7 +16,7 @@ type Mode = "login" | "signup";
 const Auth = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, signup, isLoading, isAuthenticated } = useAuth();
+  const { login, signup, isLoading: authLoading, isAuthenticated } = useAuth();
   
   // Parse query parameters
   const searchParams = new URLSearchParams(location.search);
@@ -27,7 +27,7 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
-  const [localLoading, setLocalLoading] = useState(false); // Add local loading state
+  const [localLoading, setLocalLoading] = useState(false); // Local loading state
   
   // Form state
   const [formData, setFormData] = useState({
@@ -133,8 +133,8 @@ const Auth = () => {
     }
   };
   
-  // Determine if button should show loading state
-  const buttonLoading = localLoading || isLoading;
+  // Determine if button should show loading state - combine local and auth loading states
+  const buttonLoading = localLoading || authLoading;
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -177,6 +177,7 @@ const Auth = () => {
                       value={formData.name}
                       onChange={handleChange}
                       className={errors.name ? "border-red-500" : ""}
+                      disabled={buttonLoading}
                     />
                     {errors.name && (
                       <p className="text-xs text-red-500">{errors.name}</p>
@@ -192,6 +193,7 @@ const Auth = () => {
                       value={formData.phone}
                       onChange={handleChange}
                       className={errors.phone ? "border-red-500" : ""}
+                      disabled={buttonLoading}
                     />
                     {errors.phone && (
                       <p className="text-xs text-red-500">{errors.phone}</p>
@@ -204,17 +206,18 @@ const Auth = () => {
                       value={formData.role} 
                       onValueChange={handleRoleChange}
                       className="flex space-x-4"
+                      disabled={buttonLoading}
                     >
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="student" id="student" />
+                        <RadioGroupItem value="student" id="student" disabled={buttonLoading} />
                         <Label htmlFor="student" className="cursor-pointer">Student</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="owner" id="owner" />
+                        <RadioGroupItem value="owner" id="owner" disabled={buttonLoading} />
                         <Label htmlFor="owner" className="cursor-pointer">Hostel Owner</Label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="admin" id="admin" />
+                        <RadioGroupItem value="admin" id="admin" disabled={buttonLoading} />
                         <Label htmlFor="admin" className="cursor-pointer">Admin</Label>
                       </div>
                     </RadioGroup>
