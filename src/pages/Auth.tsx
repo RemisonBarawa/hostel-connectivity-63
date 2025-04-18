@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { useAuth, UserRole } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -12,11 +12,12 @@ import { Eye, EyeOff, ArrowLeft } from "lucide-react";
 import Navbar from "../components/Navbar";
 
 type Mode = "login" | "signup";
+type UserRole = "student" | "owner" | "admin";
 
 const Auth = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login, signup, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { login, signup, loading: authLoading, isAuthenticated } = useAuth();
   
   // Parse query parameters
   const searchParams = new URLSearchParams(location.search);
@@ -112,18 +113,28 @@ const Auth = () => {
     
     try {
       if (mode === "login") {
-        await login({
-          email: formData.email,
-          password: formData.password,
-        });
+        const { success, error } = await login(
+          formData.email,
+          formData.password
+        );
+        
+        if (!success && error) {
+          setServerError(error.message || "Login failed");
+          setLocalLoading(false);
+        }
       } else {
-        await signup({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          password: formData.password,
-          role: formData.role,
-        });
+        const { success, error } = await signup(
+          formData.name,
+          formData.email,
+          formData.password,
+          formData.role,
+          formData.phone
+        );
+        
+        if (!success && error) {
+          setServerError(error.message || "Signup failed");
+          setLocalLoading(false);
+        }
       }
       // No need to set loading to false on success as we'll redirect
     } catch (error: any) {
