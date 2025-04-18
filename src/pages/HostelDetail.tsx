@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { MapPin, Users, Wifi, Droplet, Zap, Home, ChevronLeft, ChevronRight, Phone, Mail } from "lucide-react";
+import { MapPin, Users, Wifi, Droplet, Zap, Home, ChevronLeft, ChevronRight, Phone, Mail, MessageSquare } from "lucide-react";
 import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { Hostel } from "../components/HostelCard";
