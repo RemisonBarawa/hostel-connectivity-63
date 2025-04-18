@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,6 +10,7 @@ import { Badge } from "../components/ui/badge";
 import { Hostel } from "../components/HostelCard";
 import Navbar from "../components/Navbar";
 import { supabase } from "../integrations/supabase/client";
+import { Card, CardContent } from "../components/ui/card";
 
 // Type for booking requests
 interface BookingRequest {
@@ -35,7 +35,16 @@ const HostelDetail = () => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [hasRequestedBefore, setHasRequestedBefore] = useState(false);
   
-  // Load hostel data from Supabase
+  const defaultContactPhone = "+254713156080";
+  
+  const formatPhoneNumber = (phone: string) => {
+    return phone.replace(/(\+\d{3})(\d{3})(\d{6})/, '$1 $2 $3');
+  };
+  
+  const getWhatsAppUrl = (phone: string) => {
+    return `https://wa.me/${phone.replace(/\+/g, '')}`;
+  };
+
   useEffect(() => {
     if (!id) return;
     
@@ -43,7 +52,6 @@ const HostelDetail = () => {
     
     const fetchHostelData = async () => {
       try {
-        // Get hostel data
         const { data: hostelData, error: hostelError } = await supabase
           .from('hostels')
           .select(`
@@ -92,7 +100,6 @@ const HostelDetail = () => {
           
           setHostel(transformedHostel);
           
-          // Get owner data
           const { data: ownerData, error: ownerError } = await supabase
             .from('profiles')
             .select('*')
@@ -102,12 +109,11 @@ const HostelDetail = () => {
           if (!ownerError && ownerData) {
             setOwner({
               name: ownerData.full_name || 'Unknown',
-              email: 'owner@example.com', // This would normally come from auth data
-              phone: ownerData.phone_number || 'Not provided',
+              email: 'owner@example.com',
+              phone: ownerData.phone_number || defaultContactPhone,
             });
           }
           
-          // Check if user has already requested this hostel
           if (isAuthenticated && user) {
             const { data: bookingData, error: bookingError } = await supabase
               .from('bookings')
@@ -165,19 +171,17 @@ const HostelDetail = () => {
     setIsRequesting(true);
     
     try {
-      // Create a new booking request in Supabase
       const { error } = await supabase
         .from('bookings')
         .insert({
           hostel_id: hostel.id,
           student_id: user.id,
           status: 'pending',
-          message: null // Optional message if you want to add it
+          message: null
         });
       
       if (error) throw error;
       
-      // Show success message
       toast.success("Booking request sent successfully");
       setHasRequestedBefore(true);
       setRequestDialogOpen(false);
@@ -217,9 +221,10 @@ const HostelDetail = () => {
   
   const { name, location, price, rooms, amenities, images, description } = hostel;
   
-  // Use placeholder image if none provided
   const hasImages = images && images.length > 0;
   const currentImage = hasImages ? images[activeImageIndex] : "/placeholder.svg";
+  
+  const contactPhone = owner?.phone || defaultContactPhone;
   
   return (
     <div className="min-h-screen">
@@ -235,9 +240,7 @@ const HostelDetail = () => {
         </button>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left column: Images and details */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Image gallery */}
             <div className="relative rounded-xl overflow-hidden border border-border">
               <div className="aspect-video relative">
                 <img
@@ -300,7 +303,6 @@ const HostelDetail = () => {
               )}
             </div>
             
-            {/* Hostel details */}
             <div>
               <div className="flex items-start justify-between mb-2">
                 <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
@@ -371,31 +373,41 @@ const HostelDetail = () => {
             </div>
           </div>
           
-          {/* Right column: Owner info and booking */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl border border-border p-6 shadow-sm sticky top-24">
-              <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-              
-              {owner ? (
+            <Card className="sticky top-24">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+                
                 <div className="space-y-4">
                   <div>
                     <label className="text-sm text-muted-foreground block mb-1">Owner</label>
-                    <p className="font-medium">{owner.name}</p>
+                    <p className="font-medium">{owner?.name || 'Hostel Owner'}</p>
                   </div>
                   
                   <div>
                     <label className="text-sm text-muted-foreground block mb-1">Phone</label>
-                    <a href={`tel:${owner.phone}`} className="flex items-center text-primary hover:underline">
-                      <Phone size={16} className="mr-1" />
-                      {owner.phone}
-                    </a>
+                    <div className="text-primary font-medium">
+                      {formatPhoneNumber(contactPhone)}
+                    </div>
                   </div>
                   
-                  <div>
-                    <label className="text-sm text-muted-foreground block mb-1">Email</label>
-                    <a href={`mailto:${owner.email}`} className="flex items-center text-primary hover:underline">
-                      <Mail size={16} className="mr-1" />
-                      {owner.email}
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <a 
+                      href={`tel:${contactPhone}`}
+                      className="flex items-center justify-center gap-2 bg-primary text-white rounded-md py-2 hover:bg-primary/90 transition-colors"
+                    >
+                      <Phone size={16} />
+                      <span>Call</span>
+                    </a>
+                    
+                    <a 
+                      href={getWhatsAppUrl(contactPhone)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 bg-green-500 text-white rounded-md py-2 hover:bg-green-600 transition-colors"
+                    >
+                      <MessageSquare size={16} />
+                      <span>WhatsApp</span>
                     </a>
                   </div>
                   
@@ -438,17 +450,12 @@ const HostelDetail = () => {
                     </p>
                   )}
                 </div>
-              ) : (
-                <div className="py-4 text-center text-muted-foreground">
-                  <p>Owner information unavailable</p>
-                </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
       
-      {/* Booking request dialog */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
         <DialogContent>
           <DialogHeader>
