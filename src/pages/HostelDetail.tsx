@@ -181,6 +181,102 @@ const HostelDetail = () => {
     }
   };
   
+  const renderContactCard = () => {
+    if (!user) {
+      return (
+        <div className="text-center p-4">
+          <p className="text-sm text-muted-foreground mb-4">
+            Sign in to contact the property manager
+          </p>
+          <Button onClick={() => navigate("/auth?mode=login")}>
+            Sign In
+          </Button>
+        </div>
+      );
+    }
+
+    if (user.role === "student") {
+      return (
+        <div className="space-y-6">
+          <div>
+            <label className="text-sm text-muted-foreground block mb-1">Agency Contact</label>
+            <p className="font-medium">Student Housing Agency</p>
+          </div>
+          
+          <Button
+            className="w-full bg-primary text-white"
+            size="lg"
+            onClick={handleRequestToBook}
+            disabled={hasRequestedBefore}
+          >
+            {hasRequestedBefore ? "Request Sent" : "Book Now"}
+          </Button>
+          
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => window.location.href = `tel:+254713156080`}
+            >
+              <Phone className="mr-2 h-4 w-4" />
+              Call
+            </Button>
+            
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => window.location.href = `https://wa.me/254713156080`}
+            >
+              <MessageSquare className="mr-2 h-4 w-4" />
+              WhatsApp
+            </Button>
+          </div>
+          
+          {hasRequestedBefore && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              You've already sent a request for this hostel.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    if (owner && (user.role === "admin" || (user.role === "owner" && user.id === hostel?.ownerId))) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <label className="text-sm text-muted-foreground block mb-1">Owner</label>
+            <p className="font-medium">{owner.name}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground block mb-1">Contact Information</label>
+            <p className="font-medium">{owner.email}</p>
+            <p className="font-medium">{owner.phone}</p>
+          </div>
+          
+          {user.id === hostel?.ownerId && (
+            <div className="bg-secondary/30 p-3 rounded-md text-center">
+              <p className="text-sm mb-2">This is your hostel listing</p>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => navigate(`/hostel-edit/${hostel.id}`)}
+              >
+                Edit Listing
+              </Button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="py-4 text-center text-muted-foreground">
+        <p>No access to contact information</p>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen">
@@ -362,73 +458,7 @@ const HostelDetail = () => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl border border-border p-6 shadow-sm sticky top-24">
               <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
-              
-              {owner ? (
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-sm text-muted-foreground block mb-1">Owner</label>
-                    <p className="font-medium">{owner.name}</p>
-                  </div>
-                  
-                  {user?.role === "student" ? (
-                    <>
-                      <Button
-                        className="w-full bg-primary text-white"
-                        size="lg"
-                        onClick={handleRequestToBook}
-                        disabled={hasRequestedBefore}
-                      >
-                        {hasRequestedBefore ? "Request Sent" : "Book Now"}
-                      </Button>
-                      
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => window.location.href = `tel:+254713156080`}
-                        >
-                          <Phone className="mr-2 h-4 w-4" />
-                          Call
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          className="flex-1"
-                          onClick={() => window.location.href = `https://wa.me/254713156080`}
-                        >
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          WhatsApp
-                        </Button>
-                      </div>
-                      
-                      {hasRequestedBefore && (
-                        <p className="text-xs text-muted-foreground text-center mt-2">
-                          You've already sent a request for this hostel.
-                        </p>
-                      )}
-                    </>
-                  ) : user?.id === hostel.ownerId ? (
-                    <div className="bg-secondary/30 p-3 rounded-md text-center">
-                      <p className="text-sm mb-2">This is your hostel listing</p>
-                      <Button 
-                        variant="outline" 
-                        className="w-full"
-                        onClick={() => navigate(`/hostel-edit/${hostel.id}`)}
-                      >
-                        Edit Listing
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      You need a student account to request bookings.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="py-4 text-center text-muted-foreground">
-                  <p>Owner information unavailable</p>
-                </div>
-              )}
+              {renderContactCard()}
             </div>
           </div>
         </div>
