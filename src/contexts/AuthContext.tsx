@@ -98,48 +98,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (currentSession && currentSession.user) {
-        // Fetch profile data for the user
-        setSession(currentSession);
-        
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', currentSession.user.id)
-          .single()
-          .then(({ data: profile, error }) => {
-            if (error) {
-              console.error("Error fetching user profile:", error);
-              setIsLoading(false);
-              return;
-            }
-
-            if (profile) {
-              // Ensure we always have the email from the auth user
-              const userData: User = {
-                id: currentSession.user.id,
-                name: profile.full_name,
-                email: currentSession.user.email || '',
-                phone: profile.phone_number || '',
-                role: validateUserRole(profile.role),
-              };
-              setUser(userData);
-            }
-            setIsLoading(false);
-          })
-          .catch(err => {
-            console.error("Error in profile fetch:", err);
-            setIsLoading(false);
-          });
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        if (currentSession && currentSession.user) {
+          // Fetch profile data for the user
+          setSession(currentSession);
+          
+          return supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentSession.user.id)
+            .single();
+        }
         setIsLoading(false);
-      }
-    })
-    .catch(error => {
-      console.error("Error getting session:", error);
-      setIsLoading(false);
-    });
+        return { data: null, error: null };
+      })
+      .then(({ data: profile, error }) => {
+        if (error) {
+          console.error("Error fetching user profile:", error);
+          setIsLoading(false);
+          return;
+        }
+
+        if (profile && session) {
+          // Ensure we always have the email from the auth user
+          const userData: User = {
+            id: session.user.id,
+            name: profile.full_name,
+            email: session.user.email || '',
+            phone: profile.phone_number || '',
+            role: validateUserRole(profile.role),
+          };
+          setUser(userData);
+        }
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error("Error getting session:", error);
+        setIsLoading(false);
+      });
 
     return () => {
       subscription.unsubscribe();

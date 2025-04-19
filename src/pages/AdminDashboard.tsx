@@ -16,7 +16,6 @@ import {
 import { toast } from "sonner";
 import { Home, Users, User, Trash, Edit, UserCheck, LogIn, Mail, Phone, Check } from "lucide-react";
 import Navbar from "../components/Navbar";
-import { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
 
 interface AppUser {
@@ -27,6 +26,14 @@ interface AppUser {
   role: "student" | "owner" | "admin";
 }
 
+interface AdminHostel {
+  id: string;
+  name: string;
+  location: string;
+  price: number;
+  rooms: number;
+}
+
 interface Booking {
   id: string;
   hostel_id: string;
@@ -34,8 +41,14 @@ interface Booking {
   status: 'pending' | 'approved' | 'rejected';
   message: string;
   created_at: string;
-  hostel: Hostel;
-  student: AppUser;
+  updated_at: string;
+  hostel: AdminHostel;
+  student: {
+    id: string;
+    full_name: string;
+    phone_number: string | null;
+    email: string | null;
+  };
 }
 
 const AdminDashboard = () => {
@@ -172,13 +185,13 @@ const AdminDashboard = () => {
             student:profiles!student_id (
               id,
               full_name,
-              phone_number,
-              email
+              phone_number
             )
           `);
 
         if (error) throw error;
-        return data as Booking[];
+        
+        return data as unknown as Booking[];
       } catch (error) {
         console.error('Error fetching bookings:', error);
         toast.error('Failed to fetch bookings');
