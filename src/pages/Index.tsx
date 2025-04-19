@@ -19,31 +19,31 @@ const HeroSection = () => (
           <div className="space-y-6 animate-fade-in">
             <div className="inline-block">
               <span className="bg-primary/10 text-primary py-1 px-3 rounded-full text-sm font-medium">
-                Find your perfect hostel
+                Student Accommodation
               </span>
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              Your Gateway to <br />
+              Affordable Hostels Near <br />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
-                Comfortable Living
+                Kirinyaga University
               </span>
             </h1>
             
             <p className="text-lg text-muted-foreground max-w-md">
-              Connect with quality hostels, streamline your search, and book your ideal accommodation in minutes.
+              Browse verified hostel listings, filter by price, location, and amenities, and find your ideal accommodation near campus.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/hostel-search">
                 <Button size="lg" className="group">
-                  Find Hostels
+                  Browse Hostels Now
                   <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
                 </Button>
               </Link>
               <Link to="/auth?mode=signup">
                 <Button size="lg" variant="outline">
-                  Create Account
+                  List Your Hostel
                 </Button>
               </Link>
             </div>
@@ -88,31 +88,31 @@ const HeroSection = () => (
 );
 
 const FeaturesSection = () => (
-  <section className="py-20 bg-secondary/30">
+  <section className="py-20 bg-secondary/30" id="features">
     <div className="container mx-auto px-4 md:px-6">
-      <div className="text-center max-w-3xl mx-auto mb-16">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
-        <p className="text-muted-foreground">
-          HostelConnect provides a seamless experience for both students and hostel owners
-        </p>
-      </div>
+      <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
+        Your Trusted Platform for Student Accommodation
+      </h2>
+      <p className="text-muted-foreground text-center mb-16 max-w-2xl mx-auto">
+        Find quality hostels near Kirinyaga University with our easy-to-use platform
+      </p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {[
           {
             icon: <User className="text-primary" size={32} />,
-            title: "Create Your Account",
-            description: "Sign up as a student to find hostels or as an owner to list your property",
+            title: "Verified Listings",
+            description: "All hostel listings are verified to ensure trust and safety for students",
           },
           {
             icon: <Home className="text-primary" size={32} />,
-            title: "Find or List Hostels",
-            description: "Search for available hostels or create detailed listings for your properties",
+            title: "Local Expertise",
+            description: "Deep understanding of Kirinyaga University's housing market",
           },
           {
             icon: <Key className="text-primary" size={32} />,
-            title: "Connect & Book",
-            description: "Request bookings directly through the platform with secure messaging",
+            title: "Easy Booking",
+            description: "Simple process to find and secure your ideal accommodation",
           },
         ].map((feature, index) => (
           <div 
@@ -138,12 +138,12 @@ const CTASection = () => (
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">Ready to Find Your Perfect Hostel?</h2>
           <p className="text-lg text-muted-foreground mb-8">
-            Join thousands of students who have found their ideal accommodation through HostelConnect.
+            Join hundreds of Kirinyaga University students who have found their ideal accommodation through our platform.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/hostel-search">
               <Button size="lg" className="w-full sm:w-auto">
-                Browse Hostels
+                Search Hostels
               </Button>
             </Link>
             <Link to="/auth?mode=signup&role=owner">
