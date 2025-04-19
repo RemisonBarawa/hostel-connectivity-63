@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -15,7 +14,7 @@ import {
   DialogDescription 
 } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { Home, Users, User, Trash, Edit, UserCheck, LogIn, Mail, Phone } from "lucide-react";
+import { Home, Users, User, Trash, Edit, UserCheck, LogIn, Mail, Phone, Check } from "lucide-react";
 import Navbar from "../components/Navbar";
 import { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
@@ -28,6 +27,17 @@ interface AppUser {
   role: "student" | "owner" | "admin";
 }
 
+interface Booking {
+  id: string;
+  hostel_id: string;
+  student_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  message: string;
+  created_at: string;
+  hostel: Hostel;
+  student: AppUser;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -35,7 +45,6 @@ const AdminDashboard = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ type: "user" | "hostel"; id: string } | null>(null);
   
-  // Redirect if not authenticated or not an admin
   useEffect(() => {
     if (!isAuthenticated) {
       toast.error("Please login to access this page");
@@ -50,29 +59,23 @@ const AdminDashboard = () => {
     }
   }, [isAuthenticated, user, navigate]);
   
-  // Fetch all users from the profiles table
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ['adminUsers'],
     queryFn: async () => {
       try {
-        // Get all profiles and user emails
         const { data: profiles, error } = await supabase
           .from('profiles')
           .select('*');
           
         if (error) throw error;
         
-        // Get user emails from auth.users via the getUser API
         const usersWithEmails: AppUser[] = await Promise.all(
           profiles.map(async (profile) => {
-            // Try to get user email from auth.users (this may not be available in Supabase JS client)
             let email = null;
-            
-            // Create AppUser with available information
             return {
               id: profile.id,
               name: profile.full_name,
-              email: email, // May be updated if email is available in the auth user data
+              email: email,
               phone: profile.phone_number || 'Not provided',
               role: validateUserRole(profile.role),
             };
@@ -89,13 +92,11 @@ const AdminDashboard = () => {
     enabled: !!user && isAuthenticated && user.role === 'admin'
   });
   
-  // Helper function to validate user role
   const validateUserRole = (role: string): "student" | "owner" | "admin" => {
     const validRoles = ["student", "owner", "admin"];
     return validRoles.includes(role) ? (role as "student" | "owner" | "admin") : "student";
   };
   
-  // Fetch all hostels from the hostels table
   const { data: hostels = [], isLoading: hostelsLoading } = useQuery({
     queryKey: ['adminHostels'],
     queryFn: async () => {
@@ -110,7 +111,6 @@ const AdminDashboard = () => {
           
         if (error) throw error;
         
-        // Transform the data to match our Hostel interface
         return data.map(hostel => {
           const amenitiesData = hostel.amenities && hostel.amenities[0] ? hostel.amenities[0] : {
             wifi: false,
@@ -154,39 +154,66 @@ const AdminDashboard = () => {
     enabled: !!user && isAuthenticated && user.role === 'admin'
   });
   
-  // Fetch all bookings to get the count
-  const { data: bookingsCount = 0, isLoading: bookingsLoading } = useQuery({
-    queryKey: ['adminBookingsCount'],
+  const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
+    queryKey: ['adminBookings'],
     queryFn: async () => {
       try {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
           .from('bookings')
-          .select('*', { count: 'exact', head: true });
-          
+          .select(`
+            *,
+            hostel:hostels (
+              id,
+              name,
+              location,
+              price,
+              rooms
+            ),
+            student:profiles!student_id (
+              id,
+              full_name,
+              phone_number,
+              email
+            )
+          `);
+
         if (error) throw error;
-        
-        return count || 0;
+        return data as Booking[];
       } catch (error) {
-        console.error('Error fetching bookings count:', error);
-        return 0;
+        console.error('Error fetching bookings:', error);
+        toast.error('Failed to fetch bookings');
+        return [];
       }
     },
     enabled: !!user && isAuthenticated && user.role === 'admin'
   });
   
-  // Open delete confirmation dialog
+  const handleBookingStatusUpdate = async (bookingId: string, status: 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status })
+        .eq('id', bookingId);
+
+      if (error) throw error;
+
+      toast.success(`Booking ${status} successfully`);
+    } catch (error) {
+      console.error('Error updating booking:', error);
+      toast.error('Failed to update booking status');
+    }
+  };
+  
   const openDeleteDialog = (type: "user" | "hostel", id: string) => {
     setItemToDelete({ type, id });
     setDeleteDialogOpen(true);
   };
   
-  // Delete user or hostel
   const handleDelete = async () => {
     if (!itemToDelete) return;
     
     try {
       if (itemToDelete.type === "user") {
-        // Check if trying to delete self
         if (itemToDelete.id === user?.id) {
           toast.error("You cannot delete your own account");
           setDeleteDialogOpen(false);
@@ -194,7 +221,6 @@ const AdminDashboard = () => {
           return;
         }
         
-        // Delete from Supabase - this will cascade to the auth.users table via RLS policies
         const { error } = await supabase
           .from('profiles')
           .delete()
@@ -204,7 +230,6 @@ const AdminDashboard = () => {
         
         toast.success("User deleted successfully");
       } else if (itemToDelete.type === "hostel") {
-        // Delete from Supabase
         const { error } = await supabase
           .from('hostels')
           .delete()
@@ -223,7 +248,6 @@ const AdminDashboard = () => {
     }
   };
   
-  // Login as user (for admin testing)
   const loginAsUser = async (userId: string) => {
     try {
       const { data: targetUser, error } = await supabase
@@ -237,8 +261,6 @@ const AdminDashboard = () => {
         return;
       }
       
-      // Since we can't directly impersonate users in Supabase, 
-      // we'll just redirect to their dashboard based on role
       if (targetUser.role === 'student') {
         navigate('/student-dashboard');
         toast.success(`Viewing as student: ${targetUser.full_name}`);
@@ -256,16 +278,13 @@ const AdminDashboard = () => {
   
   const isLoading = usersLoading || hostelsLoading || bookingsLoading;
   
-  // Calculate stats
   const studentCount = users.filter((appUser) => appUser.role === "student").length;
   const ownerCount = users.filter((appUser) => appUser.role === "owner").length;
   const adminCount = users.filter((appUser) => appUser.role === "admin").length;
 
-  // Format phone number for display
   const formatPhoneNumber = (phone: string) => {
     if (!phone || phone === 'Not provided') return 'Not provided';
     
-    // Simple formatting - in production you might want more sophisticated formatting
     return phone;
   };
   
@@ -322,7 +341,7 @@ const AdminDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="flex justify-between items-end">
-                <div className="text-3xl font-bold">{bookingsCount}</div>
+                <div className="text-3xl font-bold">{bookings.length}</div>
                 <UserCheck className="text-muted-foreground" size={24} />
               </div>
             </CardContent>
@@ -351,6 +370,9 @@ const AdminDashboard = () => {
                   </TabsTrigger>
                   <TabsTrigger value="hostels">
                     Hostels ({hostels.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="bookings">
+                    Bookings ({bookings.length})
                   </TabsTrigger>
                 </TabsList>
                 
@@ -502,13 +524,102 @@ const AdminDashboard = () => {
                     </table>
                   </div>
                 </TabsContent>
+                
+                <TabsContent value="bookings">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Hostel</th>
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Student</th>
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Status</th>
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Message</th>
+                          <th className="py-3 px-4 text-left font-medium text-muted-foreground">Date</th>
+                          <th className="py-3 px-4 text-right font-medium text-muted-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bookings.map((booking) => (
+                          <tr key={booking.id} className="border-b border-border hover:bg-secondary/5">
+                            <td className="py-4 px-4">
+                              <div className="font-medium">{booking.hostel.name}</div>
+                              <div className="text-sm text-muted-foreground">{booking.hostel.location}</div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="space-y-1">
+                                <div className="font-medium">{booking.student.full_name}</div>
+                                <div className="flex items-center text-sm">
+                                  <Phone size={14} className="mr-1.5 text-muted-foreground" />
+                                  {booking.student.phone_number || 'Not provided'}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <span className={`inline-block px-2 py-1 rounded text-xs font-medium 
+                                ${booking.status === "approved" 
+                                  ? "bg-green-100 text-green-800" 
+                                  : booking.status === "rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {booking.status}
+                              </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="text-sm text-muted-foreground max-w-xs truncate">
+                                {booking.message || 'No message'}
+                              </div>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="text-sm text-muted-foreground">
+                                {new Date(booking.created_at).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="py-4 px-4 text-right">
+                              {booking.status === 'pending' && (
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleBookingStatusUpdate(booking.id, 'approved')}
+                                    className="text-green-600 border-green-200 hover:bg-green-50"
+                                  >
+                                    <Check size={14} className="mr-1" />
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleBookingStatusUpdate(booking.id, 'rejected')}
+                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                  >
+                                    <Trash size={14} className="mr-1" />
+                                    Reject
+                                  </Button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                        
+                        {bookings.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                              No booking requests found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </TabsContent>
               </Tabs>
             </div>
           )}
         </div>
       </div>
       
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
