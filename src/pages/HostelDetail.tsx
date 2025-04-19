@@ -389,7 +389,7 @@ const HostelDetail = () => {
               <div className="flex items-start justify-between mb-2">
                 <h1 className="text-2xl md:text-3xl font-semibold">{name}</h1>
                 <div className="bg-secondary/60 text-foreground px-4 py-2 rounded-md">
-                  <span className="text-lg font-semibold">${price}</span>
+                  <span className="text-lg font-semibold">KES {price}</span>
                   <span className="text-sm">/month</span>
                 </div>
               </div>
@@ -477,7 +477,7 @@ const HostelDetail = () => {
             <div className="bg-secondary/20 p-4 rounded-md mb-4">
               <h3 className="font-medium">{name}</h3>
               <p className="text-sm text-muted-foreground">{location}</p>
-              <p className="font-medium mt-1">${price}/month</p>
+              <p className="font-medium mt-1">KES {price}/month</p>
             </div>
             
             <div className="space-y-3">

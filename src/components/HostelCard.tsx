@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardFooter } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -51,7 +52,7 @@ const HostelCard = ({ hostel, compact = false }: HostelCardProps) => {
         />
         <div className="absolute top-2 right-2">
           <Badge variant="secondary" className="bg-white/90 text-primary-foreground backdrop-blur-sm">
-            ${price}/month
+            KES {price}/month
           </Badge>
         </div>
       </div>
