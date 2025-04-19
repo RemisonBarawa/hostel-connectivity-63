@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
-import { MapPin, Users, Wifi, Droplet, Zap, Home, ChevronLeft, ChevronRight, Phone, Mail, MessageSquare, WhatsApp } from "lucide-react";
+import { MapPin, Users, Wifi, Droplet, Zap, Home, ChevronLeft, ChevronRight, Phone, Mail, MessageSquare } from "lucide-react";
 import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
 import { Hostel } from "../components/HostelCard";
@@ -396,7 +396,7 @@ const HostelDetail = () => {
                           className="flex-1"
                           onClick={() => window.location.href = `https://wa.me/254713156080`}
                         >
-                          <WhatsApp className="mr-2 h-4 w-4" />
+                          <MessageSquare className="mr-2 h-4 w-4" />
                           WhatsApp
                         </Button>
                       </div>
