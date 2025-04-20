@@ -84,11 +84,20 @@ const AdminDashboard = () => {
         
         const usersWithEmails: AppUser[] = await Promise.all(
           profiles.map(async (profile) => {
+            const { data: emailData, error: emailError } = await supabase
+              .functions.invoke('get_user_email', {
+                body: { user_id: profile.id }
+              });
+            
             let email = null;
+            if (!emailError && Array.isArray(emailData) && emailData.length > 0) {
+              email = emailData[0].email;
+            }
+
             return {
               id: profile.id,
               name: profile.full_name,
-              email: email,
+              email: email || 'Email not available',
               phone: profile.phone_number || 'Not provided',
               role: validateUserRole(profile.role),
             };

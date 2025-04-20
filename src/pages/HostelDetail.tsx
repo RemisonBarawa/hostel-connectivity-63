@@ -103,10 +103,8 @@ const HostelDetail = () => {
             if (!ownerError && ownerData) {
               let ownerEmail = 'Email not available';
               
-              if (!ownerEmailError && ownerEmailData) {
-                if (Array.isArray(ownerEmailData) && ownerEmailData.length > 0 && ownerEmailData[0].email) {
-                  ownerEmail = ownerEmailData[0].email;
-                }
+              if (!ownerEmailError && Array.isArray(ownerEmailData) && ownerEmailData.length > 0) {
+                ownerEmail = ownerEmailData[0].email;
               }
               
               setOwner({

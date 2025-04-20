@@ -27,23 +27,9 @@ serve(async (req) => {
       );
     }
 
-    const { data, error } = await supabaseClient
-      .from("profiles")
-      .select("id")
-      .eq("id", user_id)
-      .single();
-
-    if (error) {
-      console.error("Error finding user:", error);
-      return new Response(
-        JSON.stringify({ error: "User not found" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 }
-      );
-    }
-
-    // Get the email from auth.users table using direct query
+    // Use the get_user_email RPC function to retrieve the email
     const { data: userData, error: userError } = await supabaseClient
-      .rpc("get_user_email", { user_id });
+      .rpc('get_user_email', { user_id });
 
     if (userError) {
       console.error("Error fetching user email:", userError);
