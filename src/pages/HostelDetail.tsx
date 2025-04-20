@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -89,7 +88,6 @@ const HostelDetail = () => {
           
           setHostel(transformedHostel);
           
-          // Fetch owner profile and user email from auth.users
           if (hostelData.owner_id) {
             const { data: ownerData, error: ownerError } = await supabase
               .from('profiles')
@@ -97,14 +95,17 @@ const HostelDetail = () => {
               .eq('id', hostelData.owner_id)
               .single();
             
-            // Fetch owner's email from auth.users (using custom function if needed)
             const { data: ownerUserData, error: ownerUserError } = await supabase
               .rpc('get_user_email', { user_id: hostelData.owner_id });
             
             if (!ownerError && ownerData) {
+              const ownerEmail = Array.isArray(ownerUserData) && ownerUserData.length > 0 
+                ? ownerUserData[0].email 
+                : 'Email not available';
+              
               setOwner({
                 name: ownerData.full_name || 'Unknown',
-                email: ownerUserData?.email || 'Email not available',
+                email: ownerEmail,
                 phone: ownerData.phone_number || 'Not provided',
               });
             } else {
