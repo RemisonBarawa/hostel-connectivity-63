@@ -95,13 +95,19 @@ const HostelDetail = () => {
               .eq('id', hostelData.owner_id)
               .single();
             
-            const { data: ownerUserData, error: ownerUserError } = await supabase
-              .rpc('get_user_email', { user_id: hostelData.owner_id });
+            const { data: ownerEmailData, error: ownerEmailError } = await supabase
+              .functions.invoke('get_user_email', {
+                body: { user_id: hostelData.owner_id }
+              });
             
             if (!ownerError && ownerData) {
-              const ownerEmail = Array.isArray(ownerUserData) && ownerUserData.length > 0 
-                ? ownerUserData[0].email 
-                : 'Email not available';
+              let ownerEmail = 'Email not available';
+              
+              if (!ownerEmailError && ownerEmailData) {
+                if (Array.isArray(ownerEmailData) && ownerEmailData.length > 0 && ownerEmailData[0].email) {
+                  ownerEmail = ownerEmailData[0].email;
+                }
+              }
               
               setOwner({
                 name: ownerData.full_name || 'Unknown',
@@ -109,7 +115,7 @@ const HostelDetail = () => {
                 phone: ownerData.phone_number || 'Not provided',
               });
             } else {
-              console.error("Error fetching owner data:", ownerError || ownerUserError);
+              console.error("Error fetching owner data:", ownerError || ownerEmailError);
               setOwner({
                 name: 'Unknown',
                 email: 'Email not available',
