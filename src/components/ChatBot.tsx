@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MessageSquare, X, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -21,6 +22,7 @@ const ChatBot = () => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -59,6 +61,10 @@ const ChatBot = () => {
       
       const data = await response.json();
       
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
     } catch (error) {
       console.error('Error getting response:', error);
@@ -75,22 +81,29 @@ const ChatBot = () => {
   return (
     <>
       {/* Chat button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className={`fixed ${isMobile ? 'bottom-4 right-4' : 'bottom-6 right-6'} z-50`}>
         <Button
           onClick={() => setIsOpen(!isOpen)}
-          className="rounded-full w-16 h-16 shadow-lg"
+          className={`rounded-full shadow-lg ${isMobile ? 'w-12 h-12' : 'w-16 h-16'}`}
+          aria-label={isOpen ? "Close chat" : "Open chat"}
         >
           {isOpen ? (
-            <X size={24} />
+            <X size={isMobile ? 20 : 24} />
           ) : (
-            <MessageSquare size={24} />
+            <MessageSquare size={isMobile ? 20 : 24} />
           )}
         </Button>
       </div>
 
       {/* Chat window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 w-96 h-[500px] bg-white rounded-lg shadow-xl flex flex-col overflow-hidden border border-border z-50">
+        <div 
+          className={`fixed z-50 bg-white rounded-lg shadow-xl flex flex-col overflow-hidden border border-border
+            ${isMobile 
+              ? 'bottom-20 right-4 left-4 h-[60vh] max-h-[500px]' 
+              : 'bottom-24 right-6 w-96 h-[500px]'
+            }`}
+        >
           {/* Chat header */}
           <div className="bg-primary p-4 text-white flex justify-between items-center">
             <div className="flex items-center">
@@ -143,9 +156,16 @@ const ChatBot = () => {
                 placeholder="Type your message..."
                 disabled={isLoading}
                 className="flex-1"
+                aria-label="Chat message"
               />
-              <Button type="submit" size="icon" disabled={isLoading || !inputValue.trim()}>
+              <Button 
+                type="submit" 
+                size="icon" 
+                disabled={isLoading || !inputValue.trim()}
+                aria-label="Send message"
+              >
                 <Send size={18} />
+                <span className="sr-only">Send</span>
               </Button>
             </form>
           </div>
