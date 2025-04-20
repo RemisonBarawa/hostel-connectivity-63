@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -88,18 +89,32 @@ const HostelDetail = () => {
           
           setHostel(transformedHostel);
           
-          const { data: ownerData, error: ownerError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', hostelData.owner_id)
-            .single();
-          
-          if (!ownerError && ownerData) {
-            setOwner({
-              name: ownerData.full_name || 'Unknown',
-              email: 'owner@example.com',
-              phone: ownerData.phone_number || 'Not provided',
-            });
+          // Fetch owner profile and user email from auth.users
+          if (hostelData.owner_id) {
+            const { data: ownerData, error: ownerError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', hostelData.owner_id)
+              .single();
+            
+            // Fetch owner's email from auth.users (using custom function if needed)
+            const { data: ownerUserData, error: ownerUserError } = await supabase
+              .rpc('get_user_email', { user_id: hostelData.owner_id });
+            
+            if (!ownerError && ownerData) {
+              setOwner({
+                name: ownerData.full_name || 'Unknown',
+                email: ownerUserData?.email || 'Email not available',
+                phone: ownerData.phone_number || 'Not provided',
+              });
+            } else {
+              console.error("Error fetching owner data:", ownerError || ownerUserError);
+              setOwner({
+                name: 'Unknown',
+                email: 'Email not available',
+                phone: 'Not provided',
+              });
+            }
           }
           
           if (isAuthenticated && user) {
@@ -250,8 +265,14 @@ const HostelDetail = () => {
           </div>
           <div>
             <label className="text-sm text-muted-foreground block mb-1">Contact Information</label>
-            <p className="font-medium">{owner.email}</p>
-            <p className="font-medium">{owner.phone}</p>
+            <div className="flex items-center gap-2 mb-1">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              <p className="font-medium">{owner.email}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <p className="font-medium">{owner.phone}</p>
+            </div>
           </div>
           
           {user.id === hostel?.ownerId && (
