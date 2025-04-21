@@ -1,9 +1,15 @@
-
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Home, Key, User } from "lucide-react";
 import Navbar from "../components/Navbar";
+import { 
+  Carousel, 
+  CarouselContent, 
+  CarouselItem, 
+  CarouselNext, 
+  CarouselPrevious 
+} from "@/components/ui/carousel";
 
 const HeroSection = () => (
   <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
@@ -53,11 +59,27 @@ const HeroSection = () => (
         <div className="md:w-1/2 mt-12 md:mt-0 animate-fade-in" style={{ animationDelay: "0.2s" }}>
           <div className="relative">
             <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-border">
-              <img 
-                src="https://images.unsplash.com/photo-1555854877-bab0e564b8d5?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80" 
-                alt="Modern hostel room" 
-                className="w-full h-auto rounded-t-2xl"
-              />
+              <Carousel className="w-full">
+                <CarouselContent>
+                  {[
+                    "photo-1555854877-bab0e564b8d5",
+                    "photo-1649972904349-6e44c42644a7",
+                    "photo-1488590528505-98d2b5aba04b",
+                    "photo-1581091226825-a6a2a5aee158"
+                  ].map((id, index) => (
+                    <CarouselItem key={id}>
+                      <img 
+                        src={`https://images.unsplash.com/${id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80`}
+                        alt={`Student hostel preview ${index + 1}`}
+                        className="w-full h-[300px] object-cover rounded-t-2xl"
+                      />
+                    </CarouselItem>
+                  ))}
+                </CarouselContent>
+                <CarouselPrevious className="left-2" />
+                <CarouselNext className="right-2" />
+              </Carousel>
+              
               <div className="p-6 space-y-4">
                 <h3 className="text-xl font-semibold">Student-Friendly Accommodations</h3>
                 <p className="text-muted-foreground">Find affordable, quality hostels close to your campus.</p>
