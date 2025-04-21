@@ -11,8 +11,8 @@ import { Home, Clock, Check, X, ExternalLink } from "lucide-react";
 import Navbar from "../components/Navbar";
 import HostelCard, { Hostel } from "../components/HostelCard";
 import { supabase } from "../integrations/supabase/client";
+import { CreditCard } from "lucide-react";
 
-// Type for booking requests with stricter typing
 interface BookingRequest {
   id: string;
   hostel_id: string;
@@ -29,7 +29,6 @@ const StudentDashboard = () => {
   const { user, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   
-  // Redirect if not authenticated or not a student
   useEffect(() => {
     if (!isAuthenticated) {
       toast.error("Please login to access this page");
@@ -44,14 +43,12 @@ const StudentDashboard = () => {
     }
   }, [isAuthenticated, user, navigate]);
   
-  // Fetch student bookings
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ['studentBookings', user?.id],
     queryFn: async () => {
       if (!user) return [] as BookingRequest[];
       
       try {
-        // Get bookings for this student
         const { data: bookingData, error: bookingError } = await supabase
           .from('bookings')
           .select('*')
@@ -59,7 +56,6 @@ const StudentDashboard = () => {
           
         if (bookingError) throw bookingError;
         
-        // Get hostel details for each booking
         const bookingsWithHostels = await Promise.all(
           bookingData.map(async (booking) => {
             const { data: hostelData, error: hostelError } = await supabase
@@ -128,7 +124,6 @@ const StudentDashboard = () => {
     enabled: !!user && isAuthenticated
   });
   
-  // Cancel a booking request
   const cancelBookingMutation = useMutation({
     mutationFn: async (bookingId: string) => {
       const { error } = await supabase
@@ -155,12 +150,10 @@ const StudentDashboard = () => {
     cancelBookingMutation.mutate(bookingId);
   };
   
-  // Group bookings by status
   const pendingBookings = bookings.filter((booking) => booking.status === "pending");
   const approvedBookings = bookings.filter((booking) => booking.status === "approved");
   const rejectedBookings = bookings.filter((booking) => booking.status === "rejected");
   
-  // Components for different booking statuses
   const BookingsList = ({ filteredBookings }: { filteredBookings: BookingRequest[] }) => {
     if (filteredBookings.length === 0) {
       return (
@@ -191,7 +184,7 @@ const StudentDashboard = () => {
                       <p className="text-sm text-muted-foreground mb-1">
                         {hostel?.location || "Unknown Location"}
                       </p>
-                      <p className="text-sm font-medium">${hostel?.price}/month</p>
+                      <p className="text-sm font-medium">KES {hostel?.price}/month</p>
                     </div>
                     
                     <Badge
@@ -234,6 +227,18 @@ const StudentDashboard = () => {
                         className="text-red-600 border-red-200 hover:bg-red-50"
                       >
                         Cancel Request
+                      </Button>
+                    )}
+                    
+                    {booking.status === "approved" && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => navigate(`/payment/${booking.id}`)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <CreditCard size={16} className="mr-2" />
+                        Pay Deposit
                       </Button>
                     )}
                     
