@@ -134,12 +134,16 @@ const ChatBot = () => {
                       : 'bg-secondary/50 text-foreground'
                   }`}
                 >
-                  {message.content.split('\n').map((line, j) => (
-                    <React.Fragment key={j}>
-                      {line}
-                      {j < message.content.split('\n').length - 1 && <br />}
-                    </React.Fragment>
-                  ))}
+                  {message.content.split('\n').map((line, j) => {
+                    return j < message.content.split('\n').length - 1 ? (
+                      <span key={j}>
+                        {line}
+                        <br />
+                      </span>
+                    ) : (
+                      <span key={j}>{line}</span>
+                    );
+                  })}
                 </div>
               </div>
             ))}
