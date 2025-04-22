@@ -10,114 +10,121 @@ import {
   CarouselNext, 
   CarouselPrevious 
 } from "@/components/ui/carousel";
+import useEmblaCarousel from "embla-carousel-react";
+import Autoplay from "embla-carousel-autoplay";
 
-const HeroSection = () => (
-  <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-r from-white via-secondary/20 to-primary/5 -z-10" />
-    
-    <div className="absolute top-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
-    <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10" />
-    
-    <div className="container mx-auto px-4 md:px-6 py-10 md:py-20">
-      <div className="flex flex-col md:flex-row items-center">
-        <div className="md:w-1/2 md:pr-12">
-          <div className="space-y-6 animate-fade-in">
-            <div className="inline-block">
-              <span className="bg-primary/10 text-primary py-1 px-3 rounded-full text-sm font-medium">
-                Student Accommodation
-              </span>
-            </div>
-            
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              Affordable Hostels Near <br />
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
-                Kirinyaga University
-              </span>
-            </h1>
-            
-            <p className="text-lg text-muted-foreground max-w-md">
-              Browse verified hostel listings, filter by price, location, and amenities, and find your ideal accommodation near campus.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/hostel-search">
-                <Button size="lg" className="group">
-                  Browse Hostels Now
-                  <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
-                </Button>
-              </Link>
-              <Link to="/auth?mode=signup">
-                <Button size="lg" variant="outline">
-                  List Your Hostel
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-        
-        <div className="md:w-1/2 mt-12 md:mt-0 animate-fade-in" style={{ animationDelay: "0.2s" }}>
-          <div className="relative">
-            <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-border">
-              <Carousel 
-                className="w-full" 
-                opts={{
-                  align: "start",
-                  loop: true,
-                  slidesToScroll: 1,
-                  autoplay: {
-                    delay: 3000,
-                    stopOnLastSlide: false,
-                    pauseOnMouseEnter: true
-                  }
-                }}
-              >
-                <CarouselContent>
-                  {[
-                    "photo-1555854877-bab0e564b8d5",
-                    "photo-1649972904349-6e44c42644a7",
-                    "photo-1488590528505-98d2b5aba04b",
-                    "photo-1581091226825-a6a2a5aee158"
-                  ].map((id, index) => (
-                    <CarouselItem key={id}>
-                      <img 
-                        src={`https://images.unsplash.com/${id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80`}
-                        alt={`Student hostel preview ${index + 1}`}
-                        className="w-full h-[300px] object-cover rounded-t-2xl"
-                      />
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <CarouselPrevious className="left-2" />
-                <CarouselNext className="right-2" />
-              </Carousel>
+const HeroSection = () => {
+  const autoplayOptions = {
+    delay: 3000,
+    stopOnInteraction: false,
+    stopOnMouseEnter: true
+  };
+
+  return (
+    <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-r from-white via-secondary/20 to-primary/5 -z-10" />
+      
+      <div className="absolute top-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
+      <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10" />
+      
+      <div className="container mx-auto px-4 md:px-6 py-10 md:py-20">
+        <div className="flex flex-col md:flex-row items-center">
+          <div className="md:w-1/2 md:pr-12">
+            <div className="space-y-6 animate-fade-in">
+              <div className="inline-block">
+                <span className="bg-primary/10 text-primary py-1 px-3 rounded-full text-sm font-medium">
+                  Student Accommodation
+                </span>
+              </div>
               
-              <div className="p-6 space-y-4">
-                <h3 className="text-xl font-semibold">Student-Friendly Accommodations</h3>
-                <p className="text-muted-foreground">Find affordable, quality hostels close to your campus.</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-medium">$250-$500/month</span>
-                  <Button size="sm">View Options</Button>
-                </div>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
+                Affordable Hostels Near <br />
+                <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
+                  Kirinyaga University
+                </span>
+              </h1>
+              
+              <p className="text-lg text-muted-foreground max-w-md">
+                Browse verified hostel listings, filter by price, location, and amenities, and find your ideal accommodation near campus.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Link to="/hostel-search">
+                  <Button size="lg" className="group">
+                    Browse Hostels Now
+                    <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" size={18} />
+                  </Button>
+                </Link>
+                <Link to="/auth?mode=signup">
+                  <Button size="lg" variant="outline">
+                    List Your Hostel
+                  </Button>
+                </Link>
               </div>
             </div>
-            
-            <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-lg shadow-lg border border-border max-w-[200px] hidden md:block">
-              <div className="flex items-center space-x-3">
-                <div className="bg-primary/10 p-2 rounded-full">
-                  <Key className="text-primary" size={20} />
+          </div>
+          
+          <div className="md:w-1/2 mt-12 md:mt-0 animate-fade-in" style={{ animationDelay: "0.2s" }}>
+            <div className="relative">
+              <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-border">
+                <Carousel 
+                  className="w-full" 
+                  opts={{
+                    align: "start",
+                    loop: true,
+                  }}
+                  plugins={[
+                    Autoplay(autoplayOptions)
+                  ]}
+                >
+                  <CarouselContent>
+                    {[
+                      "photo-1555854877-bab0e564b8d5",
+                      "photo-1649972904349-6e44c42644a7",
+                      "photo-1488590528505-98d2b5aba04b",
+                      "photo-1581091226825-a6a2a5aee158"
+                    ].map((id, index) => (
+                      <CarouselItem key={id}>
+                        <img 
+                          src={`https://images.unsplash.com/${id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80`}
+                          alt={`Student hostel preview ${index + 1}`}
+                          className="w-full h-[300px] object-cover rounded-t-2xl"
+                        />
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-2" />
+                  <CarouselNext className="right-2" />
+                </Carousel>
+                
+                <div className="p-6 space-y-4">
+                  <h3 className="text-xl font-semibold">Student-Friendly Accommodations</h3>
+                  <p className="text-muted-foreground">Find affordable, quality hostels close to your campus.</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-medium">$250-$500/month</span>
+                    <Button size="sm">View Options</Button>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Quick & Secure</p>
-                  <p className="text-xs text-muted-foreground">Book in minutes</p>
+              </div>
+              
+              <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-lg shadow-lg border border-border max-w-[200px] hidden md:block">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <Key className="text-primary" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Quick & Secure</p>
+                    <p className="text-xs text-muted-foreground">Book in minutes</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 const FeaturesSection = () => (
   <section className="py-20 bg-secondary/30" id="features">
