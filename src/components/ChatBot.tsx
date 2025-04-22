@@ -45,6 +45,13 @@ const ChatBot = () => {
     
     try {
       console.log("Sending message to assistant:", userMessage);
+
+      // Create a clean history for the API call
+      const cleanHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -52,12 +59,20 @@ const ChatBot = () => {
         },
         body: JSON.stringify({ 
           message: userMessage,
-          history: messages
+          history: cleanHistory
         }),
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          console.error("Failed to parse error response:", errorText);
+          throw new Error('Failed to get response from assistant');
+        }
+        
         console.error("API error response:", errorData);
         throw new Error(errorData.error || 'Failed to get response from assistant');
       }
@@ -139,16 +154,12 @@ const ChatBot = () => {
                       : 'bg-secondary/50 text-foreground'
                   }`}
                 >
-                  {message.content.split('\n').map((line, j) => {
-                    return j < message.content.split('\n').length - 1 ? (
-                      <span key={j}>
-                        {line}
-                        <br />
-                      </span>
-                    ) : (
-                      <span key={j}>{line}</span>
-                    );
-                  })}
+                  {message.content.split('\n').map((line, j) => (
+                    <span key={j}>
+                      {line}
+                      {j < message.content.split('\n').length - 1 && <br />}
+                    </span>
+                  ))}
                 </div>
               </div>
             ))}

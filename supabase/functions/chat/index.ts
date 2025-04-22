@@ -38,9 +38,18 @@ serve(async (req) => {
       );
     }
 
-    const { message, history } = await req.json();
+    const requestData = await req.json();
+    const { message, history } = requestData;
+
+    if (!message) {
+      return new Response(
+        JSON.stringify({ error: "Missing message parameter" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     console.log("Received message:", message);
-    console.log("Chat history length:", history.length);
+    console.log("Chat history length:", history ? history.length : 0);
 
     // Prepare conversation history for Gemini
     const messages = [];
@@ -54,7 +63,7 @@ serve(async (req) => {
     // Add conversation history
     if (history && Array.isArray(history)) {
       for (const msg of history) {
-        if (msg.role && msg.content) {
+        if (msg && msg.role && msg.content) {
           messages.push({
             role: msg.role === "user" ? "user" : "model",
             parts: [{ text: msg.content }]
@@ -69,7 +78,7 @@ serve(async (req) => {
       parts: [{ text: message }]
     });
 
-    console.log("Calling Gemini API with messages:", JSON.stringify(messages));
+    console.log("Calling Gemini API with messages:", JSON.stringify(messages).substring(0, 500) + "...");
 
     // Call Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
@@ -106,11 +115,20 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API HTTP error:", response.status, errorText);
+      return new Response(
+        JSON.stringify({ error: `Gemini API error: ${response.status} - ${errorText}` }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
     const data = await response.json();
-    console.log("Gemini API response:", JSON.stringify(data));
+    console.log("Gemini API response status:", !!data.candidates);
 
     if (!data.candidates || data.candidates.length === 0) {
-      console.error("No response from Gemini API:", data);
+      console.error("No response from Gemini API:", JSON.stringify(data));
       
       // Check if there's an error message in the response
       if (data.error) {
@@ -127,7 +145,9 @@ serve(async (req) => {
     }
 
     // Extract the response from the Gemini API
-    if (!data.candidates[0].content || !data.candidates[0].content.parts || data.candidates[0].content.parts.length === 0) {
+    if (!data.candidates[0].content || 
+        !data.candidates[0].content.parts || 
+        data.candidates[0].content.parts.length === 0) {
       console.error("Invalid response format from Gemini API");
       return new Response(
         JSON.stringify({ error: "Invalid response format from assistant" }),
@@ -136,7 +156,7 @@ serve(async (req) => {
     }
 
     const assistantResponse = data.candidates[0].content.parts[0].text;
-    console.log("Assistant response:", assistantResponse);
+    console.log("Assistant response:", assistantResponse.substring(0, 100) + "...");
 
     return new Response(
       JSON.stringify({ response: assistantResponse }),
