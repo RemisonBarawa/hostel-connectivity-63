@@ -79,10 +79,10 @@ const HeroSection = () => {
                 >
                   <CarouselContent>
                     {[
-                      "photo-1555854877-bab0e564b8d5",
-                      "photo-1649972904349-6e44c42644a7",
-                      "photo-1488590528505-98d2b5aba04b",
-                      "photo-1581091226825-a6a2a5aee158"
+                      "photo-1568605114967-8130f3a36994",
+                      "photo-1556228453-efd6c1ff04f6",
+                      "photo-1564013799919-ab600027ffc6",
+                      "photo-1605276374104-dee2a0ed3cd6"
                     ].map((id, index) => (
                       <CarouselItem key={id}>
                         <img 
@@ -101,7 +101,7 @@ const HeroSection = () => {
                   <h3 className="text-xl font-semibold">Student-Friendly Accommodations</h3>
                   <p className="text-muted-foreground">Find affordable, quality hostels close to your campus.</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-lg font-medium">$250-$500/month</span>
+                    <span className="text-lg font-medium">KES250-KES500/month</span>
                     <Button size="sm">View Options</Button>
                   </div>
                 </div>
@@ -229,8 +229,8 @@ const Footer = () => (
           <div>
             <h3 className="font-medium mb-2">Contact</h3>
             <ul className="space-y-1">
-              <li><a href="mailto:support@hostelconnect.com" className="text-sm text-muted-foreground hover:text-primary">support@hostelconnect.com</a></li>
-              <li><a href="tel:+1234567890" className="text-sm text-muted-foreground hover:text-primary">+1 (234) 567-890</a></li>
+              <li><a href="mailto:hostelconnect@gmail.com" className="text-sm text-muted-foreground hover:text-primary">support@hostelconnect.com</a></li>
+              <li><a href="tel:+1234567890" className="text-sm text-muted-foreground hover:text-primary">+254713156080</a></li>
             </ul>
           </div>
         </div>
