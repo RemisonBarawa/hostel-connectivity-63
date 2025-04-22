@@ -44,6 +44,7 @@ const ChatBot = () => {
     setIsLoading(true);
     
     try {
+      console.log("Sending message to assistant:", userMessage);
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -56,15 +57,19 @@ const ChatBot = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to get response from assistant');
+        const errorData = await response.json();
+        console.error("API error response:", errorData);
+        throw new Error(errorData.error || 'Failed to get response from assistant');
       }
       
       const data = await response.json();
       
       if (data.error) {
+        console.error("Error in response data:", data.error);
         throw new Error(data.error);
       }
       
+      console.log("Received response from assistant:", data.response);
       setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
     } catch (error) {
       console.error('Error getting response:', error);
