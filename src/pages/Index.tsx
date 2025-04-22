@@ -15,7 +15,6 @@ const HeroSection = () => (
   <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
     <div className="absolute inset-0 bg-gradient-to-r from-white via-secondary/20 to-primary/5 -z-10" />
     
-    {/* Decorative elements */}
     <div className="absolute top-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
     <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -z-10" />
     
@@ -59,7 +58,19 @@ const HeroSection = () => (
         <div className="md:w-1/2 mt-12 md:mt-0 animate-fade-in" style={{ animationDelay: "0.2s" }}>
           <div className="relative">
             <div className="bg-white shadow-xl rounded-2xl overflow-hidden border border-border">
-              <Carousel className="w-full">
+              <Carousel 
+                className="w-full" 
+                opts={{
+                  align: "start",
+                  loop: true,
+                  slidesToScroll: 1,
+                  autoplay: {
+                    delay: 3000,
+                    stopOnLastSlide: false,
+                    pauseOnMouseEnter: true
+                  }
+                }}
+              >
                 <CarouselContent>
                   {[
                     "photo-1555854877-bab0e564b8d5",
@@ -90,7 +101,6 @@ const HeroSection = () => (
               </div>
             </div>
             
-            {/* Floating card */}
             <div className="absolute -bottom-6 -left-6 bg-white p-4 rounded-lg shadow-lg border border-border max-w-[200px] hidden md:block">
               <div className="flex items-center space-x-3">
                 <div className="bg-primary/10 p-2 rounded-full">
