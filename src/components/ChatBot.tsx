@@ -134,10 +134,10 @@ const ChatBot = () => {
                       : 'bg-secondary/50 text-foreground'
                   }`}
                 >
-                  {message.content.split('\n').map((line, i) => (
-                    <React.Fragment key={i}>
+                  {message.content.split('\n').map((line, j) => (
+                    <React.Fragment key={j}>
                       {line}
-                      {i < message.content.split('\n').length - 1 && <br />}
+                      {j < message.content.split('\n').length - 1 && <br />}
                     </React.Fragment>
                   ))}
                 </div>
