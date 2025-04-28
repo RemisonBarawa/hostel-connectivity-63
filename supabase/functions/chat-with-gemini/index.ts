@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -11,7 +10,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -23,26 +21,22 @@ serve(async (req) => {
 
     const { messages } = await req.json();
 
-    // Format messages for Gemini API
     const formattedContents = [];
     
-    // Add system message if present
-    const systemMessage = messages.find((msg: any) => msg.role === 'system');
-    if (systemMessage) {
-      formattedContents.push({
-        role: "user",
-        parts: [{ text: `System instruction: ${systemMessage.content}` }]
-      });
-      
-      formattedContents.push({
-        role: "model",
-        parts: [{ text: "I'll follow those instructions." }]
-      });
-    }
+    // Add system message with refined instructions
+    formattedContents.push({
+      role: "user",
+      parts: [{ text: "System instruction: You are a concise assistant for Kirinyaga University student accommodation. Provide brief, clear responses in simple prose format without using bold text or special formatting. Keep responses focused and under three sentences when possible." }]
+    });
+    
+    formattedContents.push({
+      role: "model",
+      parts: [{ text: "I'll provide concise, clear responses without formatting." }]
+    });
     
     // Add chat history
     for (const msg of messages) {
-      if (msg.role === 'system') continue; // Skip system messages as we've handled them
+      if (msg.role === 'system') continue;
       
       const role = msg.role === 'assistant' ? 'model' : 'user';
       formattedContents.push({
