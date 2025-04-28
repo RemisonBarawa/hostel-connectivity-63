@@ -3,7 +3,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,26 +24,36 @@ serve(async (req) => {
     const { messages } = await req.json();
 
     // Format messages for Gemini API
-    const formattedMessages = messages.map((msg: any) => {
-      // Gemini uses 'model' instead of 'assistant'
-      const role = msg.role === 'assistant' ? 'model' : msg.role;
-      return {
+    const formattedContents = [];
+    
+    // Add system message if present
+    const systemMessage = messages.find((msg: any) => msg.role === 'system');
+    if (systemMessage) {
+      formattedContents.push({
+        role: "user",
+        parts: [{ text: `System instruction: ${systemMessage.content}` }]
+      });
+      
+      formattedContents.push({
+        role: "model",
+        parts: [{ text: "I'll follow those instructions." }]
+      });
+    }
+    
+    // Add chat history
+    for (const msg of messages) {
+      if (msg.role === 'system') continue; // Skip system messages as we've handled them
+      
+      const role = msg.role === 'assistant' ? 'model' : 'user';
+      formattedContents.push({
         role: role,
         parts: [{ text: msg.content }]
-      };
-    });
-
-    // Add system message if not present
-    if (!formattedMessages.some((msg: any) => msg.role === 'system')) {
-      formattedMessages.unshift({
-        role: 'system',
-        parts: [{ 
-          text: "You are a helpful assistant for HostelConnect, a platform for finding student accommodation near Kirinyaga University. Provide friendly and helpful responses about hostels, accommodations, and student housing. Keep answers concise and relevant."
-        }]
       });
     }
 
     const requestUrl = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+    
+    console.log("Making request to Gemini API with URL:", GEMINI_API_URL);
     
     const response = await fetch(requestUrl, {
       method: "POST",
@@ -51,7 +61,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        contents: formattedMessages,
+        contents: formattedContents,
         generationConfig: {
           temperature: 0.7,
           topP: 0.8,
@@ -80,8 +90,9 @@ serve(async (req) => {
     });
 
     const data = await response.json();
-
+    
     if (!response.ok) {
+      console.error("Gemini API error:", data);
       throw new Error(data.error?.message || "Failed to get response from Gemini API");
     }
 
