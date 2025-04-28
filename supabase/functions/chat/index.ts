@@ -78,7 +78,7 @@ serve(async (req) => {
       parts: [{ text: message }]
     });
 
-    console.log("Calling Gemini API with messages:", JSON.stringify(messages).substring(0, 500) + "...");
+    console.log("Calling Gemini API");
 
     // Call Gemini API
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
@@ -119,22 +119,20 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error("Gemini API HTTP error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: `Gemini API error: ${response.status} - ${errorText}` }),
+        JSON.stringify({ error: `Gemini API error: ${response.status}` }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
     const data = await response.json();
-    console.log("Gemini API response status:", !!data.candidates);
-
+    
     if (!data.candidates || data.candidates.length === 0) {
-      console.error("No response from Gemini API:", JSON.stringify(data));
+      console.error("No candidates in Gemini API response:", JSON.stringify(data));
       
-      // Check if there's an error message in the response
-      if (data.error) {
+      if (data.promptFeedback && data.promptFeedback.blockReason) {
         return new Response(
-          JSON.stringify({ error: `Error from Gemini API: ${data.error.message || JSON.stringify(data.error)}` }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          JSON.stringify({ error: `Message blocked: ${data.promptFeedback.blockReason}` }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
         );
       }
       

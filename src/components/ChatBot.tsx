@@ -63,24 +63,13 @@ const ChatBot = () => {
         }),
       });
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          console.error("Failed to parse error response:", errorText);
-          throw new Error('Failed to get response from assistant');
-        }
-        
-        console.error("API error response:", errorData);
-        throw new Error(errorData.error || 'Failed to get response from assistant');
-      }
-      
       const data = await response.json();
       
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get response from assistant');
+      }
+      
       if (data.error) {
-        console.error("Error in response data:", data.error);
         throw new Error(data.error);
       }
       
@@ -90,9 +79,15 @@ const ChatBot = () => {
       console.error('Error getting response:', error);
       toast({
         title: "Error",
-        description: "Failed to get response from assistant. Please try again.",
+        description: error.message || "Failed to get response from assistant. Please try again.",
         variant: "destructive",
       });
+      
+      // Add an error message to the chat
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: "I'm sorry, I encountered an error. Please try again or contact support if the problem persists." 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -155,10 +150,10 @@ const ChatBot = () => {
                   }`}
                 >
                   {message.content.split('\n').map((line, j) => (
-                    <span key={j}>
+                    <React.Fragment key={j}>
                       {line}
                       {j < message.content.split('\n').length - 1 && <br />}
-                    </span>
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
@@ -188,6 +183,11 @@ const ChatBot = () => {
                 <span className="sr-only">Send</span>
               </Button>
             </form>
+            {isLoading && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                HostelHelper is typing...
+              </p>
+            )}
           </div>
         </div>
       )}
