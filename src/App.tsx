@@ -16,6 +16,7 @@ import HostelSearch from "./pages/HostelSearch";
 import HostelDetail from "./pages/HostelDetail";
 import HostelCreate from "./pages/HostelCreate";
 import NotFound from "./pages/NotFound";
+import Chat from "./pages/Chat";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/hostel-search" element={<HostelSearch />} />
             <Route path="/hostel/:id" element={<HostelDetail />} />
+            <Route path="/chat" element={<Chat />} />
             
             {/* Role-specific dashboards */}
             <Route path="/student-dashboard" element={<StudentDashboard />} />
