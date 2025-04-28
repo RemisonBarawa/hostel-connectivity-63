@@ -54,12 +54,6 @@ serve(async (req) => {
     // Prepare conversation history for Gemini
     const messages = [];
     
-    // Add system prompt
-    messages.push({
-      role: "model",
-      parts: [{ text: SYSTEM_PROMPT }]
-    });
-    
     // Add conversation history
     if (history && Array.isArray(history)) {
       for (const msg of history) {
@@ -80,14 +74,20 @@ serve(async (req) => {
 
     console.log("Calling Gemini API");
 
-    // Call Gemini API
+    // Call Gemini API - Using the correct API endpoint for Gemini Pro
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        contents: messages,
+        contents: [
+          {
+            role: "model",
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
+          ...messages
+        ],
         generationConfig: {
           temperature: 0.7,
           topK: 40,
