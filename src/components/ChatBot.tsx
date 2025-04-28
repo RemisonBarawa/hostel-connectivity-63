@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { MessageSquare, X, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: 'user' | 'assistant';
@@ -52,25 +53,16 @@ const ChatBot = () => {
         content: msg.content
       }));
 
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
+      // Use Supabase function invocation instead of direct fetch
+      const { data, error } = await supabase.functions.invoke('chat', {
+        body: {
           message: userMessage,
           history: cleanHistory
-        }),
+        },
       });
       
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response from assistant');
-      }
-      
-      if (data.error) {
-        throw new Error(data.error);
+      if (error) {
+        throw new Error(error.message || 'Failed to get response from assistant');
       }
       
       console.log("Received response from assistant:", data.response);
